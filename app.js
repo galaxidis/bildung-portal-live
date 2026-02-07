@@ -1,4 +1,4 @@
-const API_URL = 'https://backend.bildungdigital.at/wp-json/wp/v2/posts?categories=6&per_page=100';
+const API_URL = 'https://backend.bildungdigital.at/wp-json/wp/v2/posts?categories=6&per_page=100&_embed';
 const STATS_URL = 'https://backend.bildungdigital.at/stats-bridge.php';
 
 async function fetchPosts() {
@@ -95,3 +95,4 @@ function setupCategoryFilter(posts) {
 
 // Start
 fetchPosts();
+
