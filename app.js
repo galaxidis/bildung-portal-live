@@ -3,63 +3,46 @@ import axios from 'axios';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import basicAuth from 'express-basic-auth';
-import mysql from 'mysql2/promise';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const dbConfig = {
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: 3306,
-    connectTimeout: 10000
-};
+// Die Adresse zu deinem neuen "Briefträger"-Skript
+const BRIDGE_URL = "https://bildungdigital.at/stats-bridge.php";
 
+// Login-Schutz
 app.use(basicAuth({
     users: { 'lehrer': 'digital2026' },
     challenge: true,
     realm: 'BILDUNGdigital Login',
 }));
 
+// Bootstrap einbinden
 app.use('/css', express.static(path.join(__dirname, 'node_modules/bootstrap/dist/css')));
 
+// API: Klick an die Bridge senden
 app.get('/api/track/:id', async (req, res) => {
-    const postId = req.params.id;
     try {
-        const connection = await mysql.createConnection(dbConfig);
-        await connection.execute(
-            'INSERT INTO portal_stats (post_id, aufrufe) VALUES (?, 1) ON DUPLICATE KEY UPDATE aufrufe = aufrufe + 1',
-            [postId]
-        );
-        await connection.end();
+        await axios.get(`${BRIDGE_URL}?action=track&id=${req.params.id}`);
         res.json({ success: true });
     } catch (err) {
-        console.error("Tracking Error:", err.message);
-        res.status(500).json({ error: "DB Error" });
+        console.error("Tracking Bridge Error:", err.message);
+        res.status(500).json({ error: "Bridge nicht erreichbar" });
     }
 });
 
+// Hauptseite
 app.get('/', async (req, res) => {
     try {
-        const [postsRes, catsRes] = await Promise.all([
+        // 1. WordPress Daten & Statistiken (über Bridge) parallel laden
+        const [postsRes, statsRes] = await Promise.all([
             axios.get("https://bildungdigital.at/wp-json/wp/v2/posts?per_page=100").catch(() => ({ data: [] })),
-            axios.get("https://bildungdigital.at/wp-json/wp/v2/categories").catch(() => ({ data: [] }))
+            axios.get(BRIDGE_URL).catch(() => ({ data: {} }))
         ]);
 
-        let stats = {};
-        try {
-            const connection = await mysql.createConnection(dbConfig);
-            const [rows] = await connection.execute('SELECT * FROM portal_stats');
-            rows.forEach(row => { stats[row.post_id] = row.aufrufe; });
-            await connection.end();
-        } catch (dbErr) {
-            console.error("DB Fetch Error:", dbErr.message);
-        }
-
         const posts = postsRes.data || [];
+        const stats = statsRes.data || {};
 
         let html = `<!DOCTYPE html>
         <html lang="de">
@@ -81,6 +64,7 @@ app.get('/', async (req, res) => {
             </style>
         </head>
         <body>
+
         <div id="h5pLayer" class="h5p-modal">
             <div class="h5p-header">
                 <h5 id="h5pTitle" class="m-0">Aufgabe</h5>
@@ -88,6 +72,7 @@ app.get('/', async (req, res) => {
             </div>
             <iframe id="h5pFrame" src=""></iframe>
         </div>
+
         <div class="hero text-center">
             <div class="container">
                 <h1>BILDUNGdigital</h1>
@@ -95,10 +80,11 @@ app.get('/', async (req, res) => {
                 <input type="text" id="searchInput" class="form-control form-control-lg rounded-pill shadow-sm" placeholder="Nach Thema suchen...">
             </div>
         </div>
+
         <div class="container mt-4">
             <div class="row" id="postsContainer">
                 ${posts.map(post => {
-                    if (!post || !post.id) return ''; // Sicherheitscheck
+                    if (!post || !post.id) return '';
                     const h5pId = post.content?.rendered?.match(/h5p-?(\d+)/i)?.[1];
                     const count = stats[post.id] || 0;
                     return `
@@ -115,19 +101,21 @@ app.get('/', async (req, res) => {
                 }).join('')}
             </div>
         </div>
+
         <script>
             function openH5P(title, h5pId, postId) {
                 document.getElementById('h5pTitle').innerText = title;
                 document.getElementById('h5pFrame').src = 'https://bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=' + h5pId;
                 document.getElementById('h5pLayer').style.display = 'block';
                 document.body.style.overflow = 'hidden';
+                // Tracking-Befehl an unsere neue Bridge senden
                 fetch('/api/track/' + postId);
             }
             function closeH5P() {
                 document.getElementById('h5pLayer').style.display = 'none';
                 document.getElementById('h5pFrame').src = '';
                 document.body.style.overflow = 'auto';
-                location.reload();
+                location.reload(); // Seite neu laden, um die neue Zahl zu sehen
             }
             document.getElementById('searchInput').addEventListener('input', function(e) {
                 const term = e.target.value.toLowerCase();
@@ -139,9 +127,9 @@ app.get('/', async (req, res) => {
         </body></html>`;
         res.send(html);
     } catch (e) {
-        console.error("Kritischer Fehler:", e);
-        res.status(500).send("Fehler beim Laden der Seite.");
+        console.error("Fehler:", e);
+        res.status(500).send("Portal konnte nicht geladen werden.");
     }
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Live auf Port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Bridge-Modus aktiv auf Port ${PORT}`));
