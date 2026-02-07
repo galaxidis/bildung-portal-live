@@ -1,99 +1,65 @@
+// Wir nutzen die Hauptdomain, da hier das SSL-Zertifikat stabil läuft
 const API_URL = 'https://bildungdigital.at/wp-json/wp/v2/posts?categories=6&per_page=100&_embed';
-const STATS_URL = 'https://backend.bildungdigital.at/stats-bridge.php';
 
 async function fetchPosts() {
+    const container = document.getElementById('posts-container');
+    
+    // Setzt den Titel im Header auf dein neues Motto
+    const headerTitle = document.querySelector('header h1') || document.querySelector('h1');
+    if (headerTitle) {
+        headerTitle.innerText = "Lehrer und Digital 2026";
+    }
+
     try {
-        console.log('Lade Daten von:', API_URL);
         const response = await fetch(API_URL);
-        if (!response.ok) throw new Error('Netzwerk-Antwort war nicht ok');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+        }
+
         const posts = await response.json();
-        displayPosts(posts);
-        setupSearch(posts);
-        setupCategoryFilter(posts);
+
+        if (!posts || posts.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 50px;">
+                    <p>Momentan sind keine Beiträge in der Kategorie "6" verfügbar.</p>
+                    <p><small>(Prüfe in WordPress, ob Beiträge in dieser Kategorie veröffentlicht sind)</small></p>
+                </div>`;
+            return;
+        }
+
+        container.innerHTML = posts.map(post => {
+            // Holt das Vorschaubild (Featured Image) oder nutzt einen Platzhalter
+            const media = post._embedded && post._embedded['wp:featuredmedia'] 
+                          ? post._embedded['wp:featuredmedia'][0].source_url 
+                          : 'https://via.placeholder.com/600x400?text=Bild+folgt';
+            
+            // Titel und Text bereinigen
+            const title = post.title.rendered;
+            const excerpt = post.excerpt.rendered.replace(/<[^>]+>/g, '').substring(0, 120);
+
+            return `
+                <div class="card" onclick="window.open('${post.link}', '_blank')" style="cursor: pointer;">
+                    <div class="card-image" style="background-image: url('${media}'); height: 200px; background-size: cover; background-position: center;"></div>
+                    <div class="card-content" style="padding: 15px;">
+                        <h3 style="margin-top: 0; color: #333;">${title}</h3>
+                        <p style="color: #666; font-size: 0.9em;">${excerpt}...</p>
+                        <span style="color: #007bff; font-weight: bold;">Mehr lesen →</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
     } catch (error) {
         console.error('Fehler beim Laden der Daten:', error);
-        document.getElementById('post-container').innerHTML = `
-            <div style="text-align:center; padding: 20px;">
-                <p>Inhalte konnten nicht geladen werden.</p>
-                <small>Bitte prüfe, ob die Brücke unter backend.bildungdigital.at aktiv ist.</small>
+        container.innerHTML = `
+            <div style="text-align: center; padding: 50px; color: red;">
+                <h3>Verbindung zum Server fehlgeschlagen</h3>
+                <p>Das Portal konnte keine Daten von bildungdigital.at empfangen.</p>
+                <p><small>Fehler: ${error.message}</small></p>
             </div>`;
     }
 }
 
-function displayPosts(posts) {
-    const container = document.getElementById('post-container');
-    container.innerHTML = '';
-
-    posts.forEach(post => {
-        // H5P-Shortcode aus dem Content extrahieren
-        const content = post.content.rendered;
-        const h5pMatch = content.match(/\[h5p id="(\d+)"\]/);
-        const h5pId = h5pMatch ? h5pMatch[1] : null;
-
-        if (h5pId) {
-            const card = document.createElement('div');
-            card.className = 'post-card';
-            
-            // Die Iframe-URL nutzt nun auch die backend-Subdomain
-            const iframeSrc = `https://backend.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}`;
-            
-            card.innerHTML = `
-                <h3>${post.title.rendered}</h3>
-                <div class="h5p-container">
-                    <iframe src="${iframeSrc}" width="100%" height="400" frameborder="0" allowfullscreen="allowfullscreen"></iframe>
-                </div>
-            `;
-            
-            // Statistik-Event
-            card.addEventListener('click', () => {
-                fetch(STATS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `post_id=${post.id}&post_title=${encodeURIComponent(post.title.rendered)}`
-                }).catch(err => console.error('Statistik-Fehler:', err));
-            });
-
-            container.appendChild(card);
-        }
-    });
-}
-
-function setupSearch(posts) {
-    const searchInput = document.getElementById('search-input');
-    if (!searchInput) return;
-    searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtered = posts.filter(post => 
-            post.title.rendered.toLowerCase().includes(term)
-        );
-        displayPosts(filtered);
-    });
-}
-
-function setupCategoryFilter(posts) {
-    const filterContainer = document.getElementById('category-filter');
-    if (!filterContainer) return;
-    const categories = ['Alle', 'Mathematik', 'Deutsch', 'Religion'];
-    
-    filterContainer.innerHTML = '';
-    categories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.textContent = cat;
-        btn.onclick = () => {
-            if (cat === 'Alle') {
-                displayPosts(posts);
-            } else {
-                const filtered = posts.filter(post => 
-                    post.content.rendered.toLowerCase().includes(cat.toLowerCase())
-                );
-                displayPosts(filtered);
-            }
-        };
-        filterContainer.appendChild(btn);
-    });
-}
-
-// Start
+// Startet den Ladevorgang
 fetchPosts();
-
-
