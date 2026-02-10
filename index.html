@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bildung Digital Portal</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px; }
+        header { text-align: center; padding: 20px; background: #fff; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #posts-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+            gap: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Lade Portal...</h1>
+    </header>
+
+    <div id="posts-container">
+        <p style="text-align: center;">Kacheln werden geladen...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
