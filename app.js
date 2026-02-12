@@ -1,53 +1,36 @@
 /**
- * BILDUNGdigital Portal - REPARATUR VERSION
- * Fokus: Stabiles Laden der Inhalte + Profi-KI Anbindung
+ * BILDUNGdigital Portal - EMERGENCY REPAIR VERSION
  */
 
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- BITTE HIER DEINEN PROFI-KEY EINTRAGEN
+const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- KEY EINTRAGEN
 
-// Wir nutzen v1 und gemini-1.5-flash (Standard für Profi-Accounts)
+// WICHTIG: v1 statt v1beta
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let allPosts = [];
 let currentH5PId = null;
 
-// 1. Initialisierung
-document.addEventListener('DOMContentLoaded', () => {
-    fetchPosts();
-    
-    document.getElementById('searchInput')?.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        displayPosts(allPosts.filter(p => 
-            p.title.rendered.toLowerCase().includes(term) || 
-            p.content.rendered.toLowerCase().includes(term)
-        ));
-    });
+// --- 1. CORE FUNKTIONEN (Müssen laufen!) ---
 
-    addQuickButtons();
-
-    document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') window.sendChatMessage();
-    });
-});
-
-// 2. Daten laden (WordPress)
 async function fetchPosts() {
+    console.log("Starte Laden der Posts...");
     try {
         const res = await fetch(API_URL);
-        if (!res.ok) throw new Error('WP API nicht erreichbar');
         allPosts = await res.json();
+        console.log("Posts geladen:", allPosts.length);
         displayPosts(allPosts);
     } catch (e) {
-        console.error("WP-Fehler:", e);
-        document.getElementById('posts-container').innerHTML = `<div class="col-12 text-center text-danger">Inhalte konnten nicht geladen werden.</div>`;
+        console.error("Fehler beim Laden der WordPress-Daten:", e);
+        const container = document.getElementById('posts-container');
+        if(container) container.innerHTML = "Fehler beim Laden der Inhalte.";
     }
 }
 
-// 3. Kacheln anzeigen
 function displayPosts(posts) {
     const container = document.getElementById('posts-container');
     if (!container) return;
+    
     container.innerHTML = posts.map(post => {
         const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
         const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
@@ -67,7 +50,8 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// 4. Modal & H5P
+// --- 2. MODAL & H5P ---
+
 window.openContent = async function(postId, directH5P = false) {
     const modal = new bootstrap.Modal(document.getElementById('contentModal'));
     const body = document.getElementById('modalTextContent');
@@ -100,9 +84,61 @@ window.openContent = async function(postId, directH5P = false) {
                 footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung öffnen</button>`;
             }
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 };
 
 window.launchH5P = function() {
     if (!currentH5PId) return;
-    document.getElementById('modalTextContent').innerHTML = `<div class="ratio ratio-16x9"><iframe src="
+    document.getElementById('modalTextContent').innerHTML = `
+        <div class="ratio ratio-16x9">
+            <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" allowfullscreen style="border:none;"></iframe>
+        </div>`;
+    document.getElementById('modalFooter').innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
+};
+
+// --- 3. KI LOGIK ---
+
+window.toggleChat = function() {
+    const chatWindow = document.getElementById('ai-chat-window');
+    if(chatWindow) chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
+};
+
+window.sendChatMessage = async function() {
+    const input = document.getElementById('chatInput');
+    const container = document.getElementById('chat-messages');
+    if (!input || !input.value.trim()) return;
+
+    const userText = input.value;
+    appendMessage("user", userText);
+    input.value = "";
+    
+    const loadingDiv = appendMessage("ai", "...");
+
+    try {
+        const response = await fetch(GEMINI_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: userText }] }]
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+            loadingDiv.innerText = "Fehler: " + data.error.message;
+        } else {
+            loadingDiv.innerText = data.candidates[0].content.parts[0].text;
+        }
+    } catch (error) {
+        loadingDiv.innerText = "Keine Verbindung zur KI möglich.";
+    }
+    container.scrollTop = container.scrollHeight;
+};
+
+function appendMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    if(!container) return;
+    const msg = document.createElement('div');
+    msg.style.cssText = role === "user" 
+        ? "background: #003366; color: white; padding: 10px 15px; border-radius: 15px; margin-left: auto; margin-top: 5px; max-width: 85%;"
+        : "background: #f1f1f1; color: black; padding: 10px 15px; border-radius: 1
