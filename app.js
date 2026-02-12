@@ -96,3 +96,38 @@ window.launchH5P = function() {
         </div>`;
     document.getElementById('modalFooter').innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
 };
+// KI-Chat Fenster öffnen/schließen
+window.toggleChat = function() {
+    const chatWindow = document.getElementById('ai-chat-window');
+    if (chatWindow.style.display === 'none' || chatWindow.style.display === '') {
+        chatWindow.style.display = 'flex';
+    } else {
+        chatWindow.style.display = 'none';
+    }
+}
+
+// Nachricht senden (Platzhalter-Funktion)
+window.sendChatMessage = function() {
+    const input = document.getElementById('chatInput');
+    const messageContainer = document.getElementById('chat-messages');
+    
+    if (input.value.trim() === "") return;
+
+    // Deine Nachricht anzeigen
+    const userMsg = document.createElement('div');
+    userMsg.style.cssText = "background: #003366; color: white; padding: 12px; border-radius: 15px; border-bottom-right-radius: 2px; align-self: flex-end; max-width: 85%; font-size: 0.9rem; margin-left: auto;";
+    userMsg.innerText = input.value;
+    messageContainer.appendChild(userMsg);
+
+    const text = input.value;
+    input.value = ""; // Feld leeren
+    
+    // Automatische Antwort (noch ohne echte KI)
+    setTimeout(() => {
+        const aiMsg = document.createElement('div');
+        aiMsg.style.cssText = "background: white; padding: 12px; border-radius: 15px; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 85%; font-size: 0.9rem;";
+        aiMsg.innerText = "Das ist eine gute Frage! Ich lerne gerade noch, wie ich auf '" + text + "' antworten soll. Bald bin ich mit der KI verbunden!";
+        messageContainer.appendChild(aiMsg);
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+    }, 1000);
+}
