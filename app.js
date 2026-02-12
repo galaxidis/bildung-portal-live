@@ -22,7 +22,10 @@ function displayPosts(posts) {
     const container = document.getElementById('posts-container');
     container.innerHTML = posts.map(post => {
         const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
-        const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
+        
+        // Prüfen ob H5P im Text oder Titel vorkommt
+        const hasH5P = post.content.rendered.toLowerCase().includes('h5p') || post.title.rendered.toLowerCase().includes('h5p');
+        
         return `
             <div class="col-md-4">
                 <div class="card h-100 shadow-sm border-0" style="border-radius:15px; overflow:hidden;">
@@ -39,49 +42,47 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// HILFSFUNKTION: Sucht die ID in allen möglichen Formaten
-function findH5PId(content) {
-    // 1. Suche nach Shortcode [h5p id="5"]
-    const shortcodeMatch = content.match(/h5p[ \-]?id=["']?(\d+)["']?/i);
-    if (shortcodeMatch) return shortcodeMatch[1];
-
-    // 2. Suche nach Iframe-Links (falls H5P bereits gerendert wurde)
-    const iframeMatch = content.match(/h5p\/embed\/(\d+)/i);
-    if (iframeMatch) return iframeMatch[1];
-
-    // 3. Suche nach div-Attributen (Gutenberg Block)
-    const attrMatch = content.match(/data-content-id=["']?(\d+)["']?/i);
-    if (attrMatch) return attrMatch[1];
-
-    return null;
-}
-
 window.openContent = async function(postId, directH5P = false) {
     const modal = new bootstrap.Modal(document.getElementById('contentModal'));
     const body = document.getElementById('modalTextContent');
     const title = document.getElementById('modalTitle');
     const footer = document.getElementById('modalFooter');
 
-    body.innerHTML = 'Wird geladen...';
+    body.innerHTML = 'Inhalt wird geladen...';
     footer.innerHTML = "";
+    currentH5PId = null; 
     modal.show();
 
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         title.innerText = post.title.rendered;
-        
-        // ID finden
-        currentH5PId = findH5PId(post.content.rendered);
+        let content = post.content.rendered;
+
+        // --- NEUE SUCHE ---
+        // 1. Suche in den TAGS (Schlagwörtern) - Das ist am sichersten!
+        if (post._embedded && post._embedded['wp:term']) {
+            const tags = post._embedded['wp:term'][1]; // Index 1 sind meistens die Tags
+            if (tags) {
+                const idTag = tags.find(t => !isNaN(t.name)); // Suche ein Tag, das eine Zahl ist
+                if (idTag) currentH5PId = idTag.name;
+            }
+        }
+
+        // 2. Fallback: Suche im Text (falls kein Tag da ist)
+        if (!currentH5PId) {
+            const match = content.match(/h5p[ \-]?id=["']?(\d+)["']?/i) || content.match(/h5p\/embed\/(\d+)/i);
+            if (match) currentH5PId = match[1];
+        }
 
         if (directH5P && currentH5PId) {
             window.launchH5P();
         } else {
-            body.innerHTML = post.content.rendered;
+            body.innerHTML = content;
             if (currentH5PId) {
-                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung (ID: ${currentH5PId}) starten</button>`;
+                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Interaktive Übung (ID: ${currentH5PId}) öffnen</button>`;
             } else if (directH5P) {
-                body.innerHTML = `<div class="alert alert-warning">H5P erkannt, aber keine ID im Text gefunden. Bitte prüfe den Shortcode im Hub.</div>` + post.content.rendered;
+                body.innerHTML = `<div class="alert alert-warning">H5P erkannt, aber keine ID gefunden. Bitte schreibe die H5P-ID (z.B. 1) als Schlagwort in den WordPress-Beitrag!</div>` + content;
             }
         }
     } catch (e) { body.innerHTML = "Fehler beim Laden."; }
