@@ -1,21 +1,21 @@
 /**
- * BILDUNGdigital Portal - Kernlogik mit Gemini KI & Diagnose
- * Stand: 12. Februar 2026
+ * BILDUNGdigital Portal - REPARATUR VERSION
+ * Fokus: Stabiles Laden der Inhalte + Profi-KI Anbindung
  */
 
-const GEMINI_API_KEY = 'AIzaSyB3ahktzahiHeKvd7r_ZgOm18EgU2HHyR8'; 
-// Wir nutzen jetzt v1 (stabil) statt v1beta und das gemini-1.5-flash Modell
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
+const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- BITTE HIER DEINEN PROFI-KEY EINTRAGEN
 
+// Wir nutzen v1 und gemini-1.5-flash (Standard für Profi-Accounts)
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let allPosts = [];
 let currentH5PId = null;
 
-// 1. Initialisierung beim Laden der Seite
+// 1. Initialisierung
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     
-    // Live-Suche Event-Listener
     document.getElementById('searchInput')?.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
         displayPosts(allPosts.filter(p => 
@@ -24,27 +24,27 @@ document.addEventListener('DOMContentLoaded', () => {
         ));
     });
 
-    // Chat-Vorschläge anzeigen
     addQuickButtons();
 
-    // Enter-Taste im Chat unterstützen
     document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') window.sendChatMessage();
     });
 });
 
-// 2. Daten vom WordPress-Hub abrufen
+// 2. Daten laden (WordPress)
 async function fetchPosts() {
     try {
         const res = await fetch(API_URL);
+        if (!res.ok) throw new Error('WP API nicht erreichbar');
         allPosts = await res.json();
         displayPosts(allPosts);
     } catch (e) {
-        document.getElementById('posts-container').innerHTML = "Fehler beim Laden der Inhalte.";
+        console.error("WP-Fehler:", e);
+        document.getElementById('posts-container').innerHTML = `<div class="col-12 text-center text-danger">Inhalte konnten nicht geladen werden.</div>`;
     }
 }
 
-// 3. Kacheln im Grid anzeigen
+// 3. Kacheln anzeigen
 function displayPosts(posts) {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -67,7 +67,7 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// 4. Inhalts-Modal & H5P Logik
+// 4. Modal & H5P
 window.openContent = async function(postId, directH5P = false) {
     const modal = new bootstrap.Modal(document.getElementById('contentModal'));
     const body = document.getElementById('modalTextContent');
@@ -84,7 +84,6 @@ window.openContent = async function(postId, directH5P = false) {
         const post = await res.json();
         title.innerText = post.title.rendered;
 
-        // ID-Suche über Schlagwörter (Tags)
         if (post._embedded && post._embedded['wp:term']) {
             const tags = post._embedded['wp:term'][1]; 
             if (tags) {
@@ -101,101 +100,9 @@ window.openContent = async function(postId, directH5P = false) {
                 footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung öffnen</button>`;
             }
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden des Beitrags."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 };
 
 window.launchH5P = function() {
     if (!currentH5PId) return;
-    document.getElementById('modalTextContent').innerHTML = `
-        <div class="ratio ratio-16x9">
-            <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" allowfullscreen style="border:none;"></iframe>
-        </div>`;
-    document.getElementById('modalFooter').innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
-};
-
-// --- 5. KI-ASSISTENT LOGIK ---
-
-window.toggleChat = function() {
-    const chatWindow = document.getElementById('ai-chat-window');
-    chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
-};
-
-function addQuickButtons() {
-    const messageContainer = document.getElementById('chat-messages');
-    const btnContainer = document.createElement('div');
-    btnContainer.style.cssText = "display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;";
-    
-    const suggestions = ["Was ist H5P?", "Hilfe zur Suche", "Über dieses Portal"];
-    suggestions.forEach(text => {
-        const btn = document.createElement('button');
-        btn.innerText = text;
-        btn.style.cssText = "border: 1px solid #003366; background: white; color: #003366; border-radius: 15px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer;";
-        btn.onclick = () => { document.getElementById('chatInput').value = text; window.sendChatMessage(); };
-        btnContainer.appendChild(btn);
-    });
-    messageContainer.appendChild(btnContainer);
-}
-
-window.sendChatMessage = async function() {
-    const input = document.getElementById('chatInput');
-    const container = document.getElementById('chat-messages');
-    const userText = input.value.trim();
-    
-    if (!userText) return;
-
-    appendMessage("user", userText);
-    input.value = "";
-    const loadingDiv = appendMessage("ai", "...");
-    
-    try {
-        const response = await fetch(GEMINI_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: `Du bist ein hilfreicher KI-Assistent für das Portal BILDUNGdigital. Antworte kurz und freundlich. Frage: ${userText}` }]
-                }]
-            })
-        });
-
-        const data = await response.json();
-
-        // Fehler-Diagnose: Zeigt an, was Google genau bemängelt
-        if (data.error) {
-            loadingDiv.innerText = "Fehler: " + data.error.message;
-            console.error("Gemini Error Detail:", data.error);
-            return;
-        }
-
-        if (data.candidates && data.candidates[0].content) {
-            const aiText = data.candidates[0].content.parts[0].text;
-            loadingDiv.innerText = aiText;
-        } else {
-            loadingDiv.innerText = "Keine Antwort erhalten. Möglicherweise wurde die Anfrage blockiert.";
-        }
-
-    } catch (error) {
-        loadingDiv.innerText = "Netzwerkfehler: Google ist nicht erreichbar. Prüfe deine Internetverbindung und den Key.";
-        console.error("Fetch Error:", error);
-    }
-    container.scrollTop = container.scrollHeight;
-};
-
-function appendMessage(role, text) {
-    const container = document.getElementById('chat-messages');
-    const msg = document.createElement('div');
-    const isUser = role === "user";
-    
-    msg.style.cssText = isUser 
-        ? "background: #003366; color: white; padding: 10px 15px; border-radius: 15px; border-bottom-right-radius: 2px; align-self: flex-end; max-width: 85%; font-size: 0.9rem; margin-left: auto; margin-top: 5px;"
-        : "background: white; padding: 10px 15px; border-radius: 15px; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 85%; font-size: 0.9rem; margin-top: 5px;";
-    
-    msg.innerText = text;
-    container.appendChild(msg);
-    container.scrollTop = container.scrollHeight;
-    return msg;
-}
-
-
-
-
+    document.getElementById('modalTextContent').innerHTML = `<div class="ratio ratio-16x9"><iframe src="
