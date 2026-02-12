@@ -1,20 +1,20 @@
 /**
- * BILDUNGdigital Portal - Kernlogik mit ECHTER Gemini KI
+ * BILDUNGdigital Portal - Kernlogik mit Gemini KI & Diagnose
  * Stand: 12. Februar 2026
  */
 
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-const GEMINI_API_KEY = 'AIzaSyB3ahktzahiHeKvd7r_ZgOm18EgU2HHyR8'; 
+const GEMINI_API_KEY = 'AIzaSyB3ahktzahiHeKvd7r_ZgOm18EgU2HHyR8'; // <-- DEINEN KEY HIER EINSETZEN
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let allPosts = [];
 let currentH5PId = null;
 
-// 1. Initialisierung
+// 1. Initialisierung beim Laden der Seite
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     
-    // Live-Suche
+    // Live-Suche Event-Listener
     document.getElementById('searchInput')?.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
         displayPosts(allPosts.filter(p => 
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ));
     });
 
+    // Chat-Vorschläge anzeigen
     addQuickButtons();
 
     // Enter-Taste im Chat unterstützen
@@ -31,20 +32,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// 2. Daten laden (WP-API)
+// 2. Daten vom WordPress-Hub abrufen
 async function fetchPosts() {
     try {
         const res = await fetch(API_URL);
         allPosts = await res.json();
         displayPosts(allPosts);
     } catch (e) {
-        document.getElementById('posts-container').innerHTML = "Fehler beim Laden.";
+        document.getElementById('posts-container').innerHTML = "Fehler beim Laden der Inhalte.";
     }
 }
 
-// 3. Kacheln anzeigen
+// 3. Kacheln im Grid anzeigen
 function displayPosts(posts) {
     const container = document.getElementById('posts-container');
+    if (!container) return;
     container.innerHTML = posts.map(post => {
         const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
         const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
@@ -64,7 +66,7 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// 4. Inhalts-Modal & H5P
+// 4. Inhalts-Modal & H5P Logik
 window.openContent = async function(postId, directH5P = false) {
     const modal = new bootstrap.Modal(document.getElementById('contentModal'));
     const body = document.getElementById('modalTextContent');
@@ -80,6 +82,8 @@ window.openContent = async function(postId, directH5P = false) {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         title.innerText = post.title.rendered;
+
+        // ID-Suche über Schlagwörter (Tags)
         if (post._embedded && post._embedded['wp:term']) {
             const tags = post._embedded['wp:term'][1]; 
             if (tags) {
@@ -87,6 +91,7 @@ window.openContent = async function(postId, directH5P = false) {
                 if (idTag) currentH5PId = idTag.name;
             }
         }
+
         if (directH5P && currentH5PId) {
             window.launchH5P();
         } else {
@@ -95,28 +100,31 @@ window.openContent = async function(postId, directH5P = false) {
                 footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung öffnen</button>`;
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden des Beitrags."; }
 };
 
 window.launchH5P = function() {
     if (!currentH5PId) return;
     document.getElementById('modalTextContent').innerHTML = `
-        <div class="ratio ratio-16x9"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" allowfullscreen style="border:none;"></iframe></div>`;
+        <div class="ratio ratio-16x9">
+            <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" allowfullscreen style="border:none;"></iframe>
+        </div>`;
     document.getElementById('modalFooter').innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
 };
 
-// --- 5. KI-ASSISTENT LOGIK MIT GEMINI API ---
+// --- 5. KI-ASSISTENT LOGIK ---
 
 window.toggleChat = function() {
     const chatWindow = document.getElementById('ai-chat-window');
     chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
-}
+};
 
 function addQuickButtons() {
     const messageContainer = document.getElementById('chat-messages');
     const btnContainer = document.createElement('div');
     btnContainer.style.cssText = "display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;";
-    const suggestions = ["Was ist H5P?", "KI im Unterricht", "Hilfe zur Seite"];
+    
+    const suggestions = ["Was ist H5P?", "Hilfe zur Suche", "Über dieses Portal"];
     suggestions.forEach(text => {
         const btn = document.createElement('button');
         btn.innerText = text;
@@ -127,7 +135,6 @@ function addQuickButtons() {
     messageContainer.appendChild(btnContainer);
 }
 
-// Nachricht an Gemini senden
 window.sendChatMessage = async function() {
     const input = document.getElementById('chatInput');
     const container = document.getElementById('chat-messages');
@@ -135,11 +142,8 @@ window.sendChatMessage = async function() {
     
     if (!userText) return;
 
-    // User-Blase
     appendMessage("user", userText);
     input.value = "";
-
-    // Lade-Anzeige ("KI denkt nach...")
     const loadingDiv = appendMessage("ai", "...");
     
     try {
@@ -148,21 +152,33 @@ window.sendChatMessage = async function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{
-                    parts: [{ text: `Du bist ein hilfreicher Assistent für das Bildungsportal BILDUNGdigital. Deine Antworten sind kurz, präzise und freundlich. Nutzerfrage: ${userText}` }]
+                    parts: [{ text: `Du bist ein hilfreicher KI-Assistent für das Portal BILDUNGdigital. Antworte kurz und freundlich. Frage: ${userText}` }]
                 }]
             })
         });
 
         const data = await response.json();
-        const aiText = data.candidates[0].content.parts[0].text;
-        
-        loadingDiv.innerText = aiText; // Ersetze "..." durch echte Antwort
+
+        // Fehler-Diagnose: Zeigt an, was Google genau bemängelt
+        if (data.error) {
+            loadingDiv.innerText = "Fehler: " + data.error.message;
+            console.error("Gemini Error Detail:", data.error);
+            return;
+        }
+
+        if (data.candidates && data.candidates[0].content) {
+            const aiText = data.candidates[0].content.parts[0].text;
+            loadingDiv.innerText = aiText;
+        } else {
+            loadingDiv.innerText = "Keine Antwort erhalten. Möglicherweise wurde die Anfrage blockiert.";
+        }
+
     } catch (error) {
-        loadingDiv.innerText = "Huch, mein Gehirn hat gerade einen Schluckauf. Prüfe bitte deinen API-Key!";
-        console.error("Gemini Error:", error);
+        loadingDiv.innerText = "Netzwerkfehler: Google ist nicht erreichbar. Prüfe deine Internetverbindung und den Key.";
+        console.error("Fetch Error:", error);
     }
     container.scrollTop = container.scrollHeight;
-}
+};
 
 function appendMessage(role, text) {
     const container = document.getElementById('chat-messages');
@@ -178,5 +194,3 @@ function appendMessage(role, text) {
     container.scrollTop = container.scrollHeight;
     return msg;
 }
-
-
