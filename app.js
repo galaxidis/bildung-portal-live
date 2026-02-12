@@ -1,106 +1,68 @@
 /**
- * BILDUNGdigital Portal - EMERGENCY REPAIR VERSION
+ * BILDUNGdigital - NOTFALL-REPARATUR
  */
 
+// 1. Grundeinstellungen
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- KEY EINTRAGEN
-
-// WICHTIG: v1 statt v1beta
+const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- BITTE KEY EINTRAGEN
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let allPosts = [];
-let currentH5PId = null;
 
-// --- 1. CORE FUNKTIONEN (Müssen laufen!) ---
+// 2. Initialisierung (Der Motor der Seite)
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Seite bereit, lade Inhalte...");
+    fetchPosts();
+    
+    // Suche aktivieren
+    const sInput = document.getElementById('searchInput');
+    if(sInput) {
+        sInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = allPosts.filter(p => p.title.rendered.toLowerCase().includes(term));
+            displayPosts(filtered);
+        });
+    }
+});
 
+// 3. WordPress Inhalte laden
 async function fetchPosts() {
-    console.log("Starte Laden der Posts...");
     try {
         const res = await fetch(API_URL);
         allPosts = await res.json();
-        console.log("Posts geladen:", allPosts.length);
         displayPosts(allPosts);
-    } catch (e) {
-        console.error("Fehler beim Laden der WordPress-Daten:", e);
-        const container = document.getElementById('posts-container');
-        if(container) container.innerHTML = "Fehler beim Laden der Inhalte.";
+    } catch (err) {
+        console.error("WP-Fehler:", err);
+        document.getElementById('posts-container').innerHTML = "Fehler beim Laden der Kacheln.";
     }
 }
 
+// 4. Kacheln anzeigen
 function displayPosts(posts) {
     const container = document.getElementById('posts-container');
     if (!container) return;
-    
+
     container.innerHTML = posts.map(post => {
-        const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
-        const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
+        const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
         return `
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm border-0" style="border-radius:15px; overflow:hidden;">
                     <img src="${media}" class="card-img-top" style="height:180px; object-fit:cover;">
-                    <div class="card-body d-flex flex-column">
+                    <div class="card-body">
                         <h5 class="card-title fw-bold">${post.title.rendered}</h5>
-                        <div class="mt-auto pt-3 d-flex gap-2">
-                            <button onclick="window.openContent(${post.id}, false)" class="btn btn-sm btn-outline-primary px-3 rounded-pill">Details</button>
-                            ${hasH5P ? `<button onclick="window.openContent(${post.id}, true)" class="btn btn-sm btn-success px-3 rounded-pill">🚀 H5P Start</button>` : ''}
-                        </div>
+                        <button onclick="window.openContent(${post.id})" class="btn btn-sm btn-outline-primary rounded-pill">Details</button>
                     </div>
                 </div>
             </div>`;
     }).join('');
 }
 
-// --- 2. MODAL & H5P ---
-
-window.openContent = async function(postId, directH5P = false) {
-    const modal = new bootstrap.Modal(document.getElementById('contentModal'));
-    const body = document.getElementById('modalTextContent');
-    const title = document.getElementById('modalTitle');
-    const footer = document.getElementById('modalFooter');
-
-    body.innerHTML = 'Wird geladen...';
-    footer.innerHTML = "";
-    currentH5PId = null; 
-    modal.show();
-
-    try {
-        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
-        const post = await res.json();
-        title.innerText = post.title.rendered;
-
-        if (post._embedded && post._embedded['wp:term']) {
-            const tags = post._embedded['wp:term'][1]; 
-            if (tags) {
-                const idTag = tags.find(t => !isNaN(t.name)); 
-                if (idTag) currentH5PId = idTag.name;
-            }
-        }
-
-        if (directH5P && currentH5PId) {
-            window.launchH5P();
-        } else {
-            body.innerHTML = post.content.rendered;
-            if (currentH5PId) {
-                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung öffnen</button>`;
-            }
-        }
-    } catch (e) { body.innerHTML = "Fehler."; }
-};
-
-window.launchH5P = function() {
-    if (!currentH5PId) return;
-    document.getElementById('modalTextContent').innerHTML = `
-        <div class="ratio ratio-16x9">
-            <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" allowfullscreen style="border:none;"></iframe>
-        </div>`;
-    document.getElementById('modalFooter').innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
-};
-
-// --- 3. KI LOGIK ---
-
+// 5. Chat-Funktionen
 window.toggleChat = function() {
-    const chatWindow = document.getElementById('ai-chat-window');
-    if(chatWindow) chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
+    const chat = document.getElementById('ai-chat-window');
+    if (chat) {
+        chat.style.display = (chat.style.display === 'none' || chat.style.display === '') ? 'flex' : 'none';
+    }
 };
 
 window.sendChatMessage = async function() {
@@ -108,37 +70,34 @@ window.sendChatMessage = async function() {
     const container = document.getElementById('chat-messages');
     if (!input || !input.value.trim()) return;
 
-    const userText = input.value;
-    appendMessage("user", userText);
+    const msg = input.value;
     input.value = "";
     
-    const loadingDiv = appendMessage("ai", "...");
+    // User Nachricht anzeigen
+    const uDiv = document.createElement('div');
+    uDiv.style.cssText = "background:#003366; color:white; padding:8px 12px; border-radius:10px; margin-bottom:5px; align-self:flex-end; max-width:80%; margin-left:auto;";
+    uDiv.innerText = msg;
+    container.appendChild(uDiv);
+
+    // KI Antwort
+    const aiDiv = document.createElement('div');
+    aiDiv.style.cssText = "background:#f1f1f1; padding:8px 12px; border-radius:10px; margin-bottom:5px; align-self:flex-start; max-width:80%;";
+    aiDiv.innerText = "...";
+    container.appendChild(aiDiv);
 
     try {
-        const response = await fetch(GEMINI_URL, {
+        const res = await fetch(GEMINI_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: userText }] }]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: msg }] }] })
         });
-
-        const data = await response.json();
-        if (data.error) {
-            loadingDiv.innerText = "Fehler: " + data.error.message;
-        } else {
-            loadingDiv.innerText = data.candidates[0].content.parts[0].text;
-        }
-    } catch (error) {
-        loadingDiv.innerText = "Keine Verbindung zur KI möglich.";
+        const data = await res.json();
+        aiDiv.innerText = data.candidates[0].content.parts[0].text;
+    } catch (e) {
+        aiDiv.innerText = "Fehler bei der KI-Anbindung.";
     }
     container.scrollTop = container.scrollHeight;
 };
 
-function appendMessage(role, text) {
-    const container = document.getElementById('chat-messages');
-    if(!container) return;
-    const msg = document.createElement('div');
-    msg.style.cssText = role === "user" 
-        ? "background: #003366; color: white; padding: 10px 15px; border-radius: 15px; margin-left: auto; margin-top: 5px; max-width: 85%;"
-        : "background: #f1f1f1; color: black; padding: 10px 15px; border-radius: 1
+// Platzhalter für Content-Funktion (damit kein Fehler entsteht)
+window.openContent = function(id) { alert("Beitrag ID: " + id); };
