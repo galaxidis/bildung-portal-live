@@ -71,14 +71,47 @@ async function fetchPosts() {
 /**
  * Zählt den Klick via bridge.php und öffnet dann den WordPress-Link
  */
-function trackAndOpen(url, postId) {
-    // Klick im Hintergrund registrieren (silent fetch)
-    fetch(`${STATS_BRIDGE}?id=${postId}`, { mode: 'no-cors' })
-        .catch(err => console.log("Statistik-Info:", err));
+async function openContent(postId) {
+    const modal = new bootstrap.Modal(document.getElementById('contentModal'));
+    const body = document.getElementById('modalTextContent');
+    const title = document.getElementById('modalTitle');
+    const footer = document.getElementById('modalFooter');
 
-    // Den Beitrag in neuem Tab öffnen (funktioniert jetzt für JEDEN Beitrag)
-    window.open(url, '_blank');
+    // 1. Modal zeigen & Ladezustand
+    title.innerText = "Lade...";
+    body.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>';
+    footer.innerHTML = '';
+    modal.show();
+
+    try {
+        // 2. Den kompletten Beitrag von WordPress holen
+        const response = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
+        const post = await response.json();
+
+        // 3. Titel und Text setzen (Dein Design!)
+        title.innerText = post.title.rendered;
+        body.innerHTML = `<div class="wp-content-style">${post.content.rendered}</div>`;
+
+        // 4. H5P Check: Suchen wir nach einem H5P-Shortcode oder Link im Text
+        if (post.content.rendered.includes('h5p')) {
+            footer.innerHTML = `
+                <button class="btn btn-success w-100 fw-bold" onclick="launchH5P('${postId}')">
+                    🚀 Interaktive Übung (H5P) starten
+                </button>`;
+        }
+    } catch (e) {
+        body.innerHTML = "Fehler beim Laden des Inhalts.";
+    }
+}
+
+function launchH5P(postId) {
+    // Hier laden wir dann später gezielt den H5P-Embed-Link in das Modal
+    const body = document.getElementById('modalTextContent');
+    body.innerHTML = `<iframe src="https://hub.bildungdigital.at/h5p/embed/${postId}" 
+                      style="width:100%; height:600px; border:none;" 
+                      allowfullscreen></iframe>`;
 }
 
 // Initialisierung
 fetchPosts();
+
