@@ -3,10 +3,10 @@
  * Stand: 12. Februar 2026
  */
 
-const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-const GEMINI_API_KEY = 'AIzaSyAYAS5BQT63cobSwkf7fqeiBFjkKbqQsHQ'; // <-- DEINEN KEY HIER EINSETZEN
-// Ändere v1beta in v1
+const GEMINI_API_KEY = 'AIzaSyB3ahktzahiHeKvd7r_ZgOm18EgU2HHyR8'; 
+// Wir nutzen jetzt v1 (stabil) statt v1beta und das gemini-1.5-flash Modell
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
 
 let allPosts = [];
 let currentH5PId = null;
@@ -195,5 +195,6 @@ function appendMessage(role, text) {
     container.scrollTop = container.scrollHeight;
     return msg;
 }
+
 
 
