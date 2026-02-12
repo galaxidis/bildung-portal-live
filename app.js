@@ -30,19 +30,18 @@ function displayPosts(posts) {
     container.innerHTML = posts.map(post => {
         const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
         
-        // H5P Erkennung für die Buttons
-        const contentStr = post.content.rendered.toLowerCase();
-        const hasH5P = contentStr.includes('h5p');
+        // Prüfen ob H5P vorhanden ist
+        const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
         
         return `
             <div class="col-md-4">
-                <div class="card h-100 shadow-sm border-0">
+                <div class="card h-100 shadow-sm border-0" style="border-radius:15px; overflow:hidden;">
                     <img src="${media}" class="card-img-top" style="height:180px; object-fit:cover;">
                     <div class="card-body d-flex flex-column">
-                        <h5 class="card-title fw-bold">${post.title.rendered}</h5>
+                        <h5 class="card-title fw-bold" style="font-size: 1.1rem;">${post.title.rendered}</h5>
                         <div class="mt-auto pt-3 d-flex gap-2">
-                            <button onclick="window.openContent(${post.id}, false)" class="btn btn-sm btn-outline-primary px-3 rounded-pill">Ansehen</button>
-                            ${hasH5P ? `<button onclick="window.openContent(${post.id}, true)" class="btn btn-sm btn-success px-3 rounded-pill">🚀 H5P Start</button>` : ''}
+                            <button onclick="window.openContent(${post.id}, false)" class="btn btn-sm btn-outline-primary px-3 rounded-pill">Details</button>
+                            ${hasH5P ? `<button onclick="window.openContent(${post.id}, true)" class="btn btn-sm btn-success px-3 rounded-pill shadow-sm">🚀 H5P Start</button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -50,14 +49,15 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// Die "Intelligenz-Zentrale"
+// Zentrale Funktion
 window.openContent = async function(postId, directH5P = false) {
-    const modal = new bootstrap.Modal(document.getElementById('contentModal'));
+    const modalElement = document.getElementById('contentModal');
+    const modal = new bootstrap.Modal(modalElement);
     const body = document.getElementById('modalTextContent');
     const title = document.getElementById('modalTitle');
     const footer = document.getElementById('modalFooter');
 
-    body.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div><p>Bereite Inhalt vor...</p></div>';
+    body.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>';
     footer.innerHTML = "";
     currentH5PId = null; 
     modal.show();
@@ -68,49 +68,52 @@ window.openContent = async function(postId, directH5P = false) {
         
         title.innerText = post.title.rendered;
         let content = post.content.rendered;
-        
-        // VERBESSERTE H5P-ID SUCHE:
-        // Sucht nach [h5p id="5"], h5p-php-5 oder h5p/embed/5
-        const match = content.match(/h5p[ \-\/]?id?=["'\/]?(\d+)["'\/]?/i);
+
+        // --- DER H5P-DETEKTIV ---
+        // 1. Suche nach [h5p id="XX"]
+        let match = content.match(/h5p[ \-]?id=["']?(\d+)["']?/i);
+        // 2. Suche nach h5p/embed/XX
+        if (!match) match = content.match(/h5p\/embed\/(\d+)/i);
+        // 3. Suche nach h5p-php-XX
+        if (!match) match = content.match(/h5p-php-(\d+)/i);
+
         currentH5PId = match ? match[1] : null;
 
-        // ENTSCHEIDUNG: Direkt H5P oder erst Text?
         if (directH5P && currentH5PId) {
-            // Wir springen sofort zum Iframe
             window.launchH5P();
         } else {
-            // Wir zeigen den Text
+            // Text anzeigen
             body.innerHTML = content;
             if (currentH5PId) {
-                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Übung jetzt starten</button>`;
+                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-3 fw-bold">🚀 Interaktive Übung öffnen</button>`;
             } else if (directH5P) {
-                // Falls H5P Start geklickt wurde, aber keine ID gefunden wurde:
-                body.innerHTML = `<div class="alert alert-warning">H5P-Übung wurde erkannt, aber die ID konnte nicht automatisch extrahiert werden. Hier ist der Beitragsinhalt:</div>` + content;
+                body.innerHTML = `<div class="alert alert-warning">ID nicht gefunden. Versuche den Inhalt manuell zu laden...</div>` + content;
             }
         }
         
-        body.querySelectorAll('a').forEach(link => link.target = "_blank");
+        // Alle Links im Text "unschädlich" machen
+        body.querySelectorAll('a').forEach(link => {
+            link.target = "_blank";
+            // Verhindert, dass der Link das Modal-Event stört
+            link.onclick = (e) => e.stopPropagation();
+        });
 
     } catch (e) {
-        body.innerHTML = "Fehler beim Laden des Beitrags.";
+        body.innerHTML = "Fehler beim Laden.";
     }
 };
 
 window.launchH5P = function() {
-    if (!currentH5PId) {
-        alert("H5P ID wurde nicht gefunden.");
-        return;
-    }
+    if (!currentH5PId) return;
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    // Iframe laden
     body.innerHTML = `
-        <div class="ratio ratio-16x9 shadow-sm" style="border-radius: 12px; overflow: hidden; background: #000;">
-            <iframe src="https://hub.bildungdigital.at/h5p/embed/${currentH5PId}" 
+        <div class="ratio ratio-16x9">
+            <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${currentH5PId}" 
                     allowfullscreen 
-                    style="border:none;"></iframe>
+                    style="border:none; width:100%; height:100%;"></iframe>
         </div>`;
     
-    footer.innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="window.openContent(${allPosts.find(p => p.content.rendered.includes(currentH5PId))?.id || 0}, false)">← Zurück zur Beschreibung</button>`;
+    footer.innerHTML = `<button class="btn btn-outline-secondary w-100" onclick="location.reload()">← Zurück</button>`;
 };
