@@ -3,27 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILDUNGdigital | Portal</title>
+    <title>BILDUNGdigital Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
+    
     <style>
-        body { background-color: #f8f9fa; font-family: sans-serif; }
-        .navbar { background-color: #003366; color: white; padding: 15px; margin-bottom: 30px; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: 0.3s; height: 100%; }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        .card-img-top { height: 180px; object-fit: cover; border-top-left-radius: 15px; border-top-right-radius: 15px; }
-        #ai-chat-window { position: fixed; bottom: 80px; right: 20px; width: 350px; height: 450px; background: white; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); display: none; flex-direction: column; z-index: 1000; overflow: hidden; }
-        #chat-toggle { position: fixed; bottom: 15px; right: 20px; width: 55px; height: 55px; background: #003366; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1001; font-size: 24px; }
-        #chat-messages { flex-grow: 1; padding: 15px; overflow-y: auto; background: #fdfdfd; }
+        body { background-color: #f4f7f6; font-family: Arial, sans-serif; }
+        
+        /* Header */
+        .header-nav { background-color: #003366; color: white; padding: 20px 0; margin-bottom: 30px; }
+        
+        /* Kacheln */
+        .card { 
+            border-radius: 10px; 
+            border: none; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+            height: 100%; 
+            transition: 0.3s;
+        }
+        .card:hover { transform: translateY(-5px); }
+        .card-img-top { height: 180px; object-fit: cover; border-top-left-radius: 10px; border-top-right-radius: 10px; }
+        
+        /* Chat Fenster */
+        #ai-chat-window { 
+            position: fixed; bottom: 80px; right: 20px; 
+            width: 350px; height: 450px; 
+            background: white; border-radius: 15px; 
+            box-shadow: 0 5px 25px rgba(0,0,0,0.2); 
+            display: none; flex-direction: column; z-index: 1000; 
+        }
+        
+        /* Chat Button */
+        #chat-toggle-btn { 
+            position: fixed; bottom: 20px; right: 20px; 
+            width: 60px; height: 60px; 
+            background: #003366; color: white; 
+            border-radius: 50%; display: flex; 
+            align-items: center; justify-content: center; 
+            cursor: pointer; z-index: 1001; font-size: 24px;
+        }
+        
+        #chat-messages { flex-grow: 1; padding: 15px; overflow-y: auto; }
     </style>
 </head>
 <body>
 
-    <nav class="navbar">
-        <div class="container">
-            <span class="h3 m-0">BILDUNGdigital</span>
-            <input type="text" id="searchInput" class="form-control w-25" placeholder="Suche...">
+    <div class="header-nav">
+        <div class="container d-flex justify-content-between align-items-center">
+            <h2 class="m-0">BILDUNGdigital</h2>
+            <input type="text" id="searchInput" class="form-control w-25" placeholder="Suchen...">
         </div>
-    </nav>
+    </div>
 
     <div class="container">
         <div id="posts-container" class="row g-4">
@@ -31,32 +60,34 @@
         </div>
     </div>
 
-    <div class="modal fade" id="contentModal" tabindex="-1">
+    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content" style="border-radius: 20px;">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="modalTitle">Beitrag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" id="modalTextContent"></div>
-                <div class="modal-footer d-block" id="modalFooter"></div>
+                <div class="modal-body" id="modalTextContent">
+                    </div>
+                <div id="modalFooter" class="modal-footer d-block">
+                    </div>
             </div>
         </div>
     </div>
 
     <div id="ai-chat-window">
-        <div style="background:#003366; color:white; padding:15px; display:flex; justify-content:space-between;">
+        <div style="background:#003366; color:white; padding:15px; border-radius:15px 15px 0 0; display:flex; justify-content:space-between;">
             <span>KI-Assistent</span>
             <button onclick="window.toggleChat()" class="btn-close btn-close-white"></button>
         </div>
         <div id="chat-messages"></div>
         <div class="p-2 border-top d-flex">
-            <input type="text" id="chatInput" class="form-control" placeholder="Frage...">
+            <input type="text" id="chatInput" class="form-control" placeholder="Deine Frage...">
             <button onclick="window.sendChatMessage()" class="btn btn-primary ms-2">OK</button>
         </div>
     </div>
 
-    <div id="chat-toggle" onclick="window.toggleChat()">💬</div>
+    <div id="chat-toggle-btn" onclick="window.toggleChat()">💬</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
