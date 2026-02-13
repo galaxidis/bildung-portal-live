@@ -10,98 +10,94 @@
     
     <style>
         :root {
-            --dark-blue: #003366;
-            --light-blue: #00aaff;
+            --primary-dark: #003366;
+            --accent-blue: #00aaff;
+            --bg-body: #f1f5f9;
         }
 
-        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
+        body { 
+            background-color: var(--bg-body); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            color: #1e293b; 
+        }
 
+        /* HEADER */
         .header-section {
-            padding: 40px 0;
+            padding: 50px 0;
             background: white;
             border-bottom: 1px solid #e2e8f0;
             text-align: center;
+            margin-bottom: 30px;
         }
 
-        .brand { font-weight: 800; font-size: 2.2rem; color: var(--dark-blue); margin-bottom: 25px; }
-        .brand span { color: var(--light-blue); }
+        .brand { 
+            font-weight: 800; 
+            font-size: 2.5rem; 
+            color: var(--primary-dark); 
+            margin-bottom: 20px; 
+        }
+        .brand span { color: var(--accent-blue); }
 
-        .search-container { max-width: 600px; margin: 0 auto; padding: 0 15px; }
+        /* SUCHE */
+        .search-container { max-width: 600px; margin: 0 auto; }
         #searchInput { 
             border-radius: 50px; 
-            padding: 12px 25px; 
+            padding: 15px 25px; 
             border: 2px solid #e2e8f0;
-            transition: 0.3s;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
-        /* FIX: Kacheln nebeneinander & Bilder skalieren */
+        /* GRID & KACHELN */
+        .post-wrapper {
+            display: flex; /* Erlaubt einheitliche Höhe in der Reihe */
+        }
+
         .card { 
             border: none; 
             border-radius: 20px; 
             overflow: hidden; 
             background: white;
-            transition: transform 0.3s ease;
-            height: 100%; /* Einheitliche Höhe */
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
         }
-        
-        .card:hover { transform: translateY(-8px); }
 
-        /* Bild-Container mit festem Verhältnis */
+        .card:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1); 
+        }
+
+        /* BILD-FIX: Damit alle Bilder gleich groß sind */
         .img-container {
             width: 100%;
-            aspect-ratio: 16 / 9;
+            height: 200px; /* Feste Höhe für die Kachel-Vorschau */
             overflow: hidden;
-            background: #eee;
+            background: #cbd5e1;
         }
 
         .card-img-top { 
             width: 100%; 
             height: 100%; 
-            object-fit: cover; /* Wichtig: Bild füllt den Container ohne Verzerrung */
+            object-fit: cover; /* Schneidet das Bild passend zu, ohne es zu verzerren */
+        }
+
+        .card-body {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .card-title { 
+            font-weight: 700; 
+            color: var(--primary-dark); 
+            margin-bottom: 1.5rem;
+            line-height: 1.3;
+            font-size: 1.2rem;
         }
         
-        .btn-pill { border-radius: 50px; padding: 8px 15px; font-weight: 600; font-size: 0.85rem; }
-        .btn-success { background: #22c55e; border: none; color: white; }
-
-        /* Modal Anpassung */
-        .modal-content { border-radius: 25px; border: none; }
-        iframe { width: 100%; border: none; min-height: 450px; }
-    </style>
-</head>
-<body>
-
-    <header class="header-section">
-        <div class="container">
-            <div class="brand">BILDUNG<span>digital</span></div>
-            <div class="search-container">
-                <input type="text" id="searchInput" class="form-control" placeholder="Was möchtest du lernen?">
-            </div>
-        </div>
-    </header>
-
-    <main class="container py-5">
-        <div id="posts-container" class="row g-4">
-            <div class="col-12 text-center py-5">
-                <div class="spinner-border text-primary"></div>
-                <p class="mt-2 text-muted">Portal wird vorbereitet...</p>
-            </div>
-        </div>
-    </main>
-
-    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header border-0 pb-0">
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4 pt-0" id="modalTextContent"></div>
-                <div id="modalFooter" class="modal-footer border-0 d-block text-center pb-4"></div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
-    <script src="app.js"></script>
-</body>
-</html>
+        /* BUTTONS */
+        .btn-pill {
