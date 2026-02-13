@@ -3,161 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILDUNGdigital | Portal</title>
-    
+    <title>BILDUNGdigital</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    
     <style>
-        :root {
-            --primary: #003366;
-            --accent: #00aaff;
-            --bg: #f8fafc;
-        }
-
-        body { 
-            background-color: var(--bg); 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            color: #1e293b;
-        }
-
-        /* --- HEADER & RUNDE SUCHE --- */
-        .hero-header {
-            background: white;
-            padding: 60px 0;
-            text-align: center;
-            border-bottom: 1px solid #e2e8f0;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-        }
-
-        .brand-logo {
-            font-weight: 800;
-            font-size: 2.5rem;
-            color: var(--primary);
-            margin-bottom: 30px;
-            letter-spacing: -1px;
-        }
-        .brand-logo span { color: var(--accent); }
-
-        #searchInput {
-            max-width: 600px;
-            margin: 0 auto;
-            border-radius: 50px; /* RUNDE SUCHE */
-            padding: 18px 30px;
-            border: 2px solid #f1f5f9;
-            background: white;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-        }
-
-        #searchInput:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 10px 30px rgba(0,170,255,0.15);
-            transform: scale(1.02);
-        }
-
-        /* --- SCHWEBENDE KACHELN --- */
-        .card {
-            border: none;
-            border-radius: 24px;
-            background: white;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.03);
-            overflow: hidden;
-        }
-
-        .card:hover {
-            transform: translateY(-15px); /* SCHWEBENDER EFFEKT */
-            box-shadow: 0 25px 50px rgba(0,0,0,0.1);
-        }
-
-        .card-img-top {
-            height: 200px;
-            object-fit: cover;
-            transition: transform 0.5s ease;
-        }
-
-        .card:hover .card-img-top {
-            transform: scale(1.05);
-        }
-
-        /* --- KI CHAT --- */
+        body { background-color: #f1f1f1; padding-top: 20px; }
+        .navbar { background-color: #003366; margin-bottom: 30px; padding: 15px; color: white; }
+        .card { margin-bottom: 20px; }
         #ai-chat-window { 
-            position: fixed; bottom: 100px; right: 25px; 
-            width: 380px; height: 550px; 
-            background: white; border-radius: 25px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.2); 
-            display: none; flex-direction: column; 
-            z-index: 2000; overflow: hidden; border: none;
+            position: fixed; bottom: 80px; right: 20px; 
+            width: 300px; height: 400px; background: white; 
+            border: 2px solid #003366; display: none; flex-direction: column; z-index: 9999;
         }
-
-        #chat-toggle { 
-            position: fixed; bottom: 30px; right: 30px; 
-            width: 65px; height: 65px; 
-            background: var(--primary); color: white; 
-            border-radius: 50%; display: flex; 
-            align-items: center; justify-content: center; 
-            cursor: pointer; z-index: 2001; font-size: 28px;
-            box-shadow: 0 10px 25px rgba(0,51,102,0.3);
-            transition: all 0.3s ease;
+        #chat-toggle-btn { 
+            position: fixed; bottom: 20px; right: 20px; 
+            width: 50px; height: 50px; background: #003366; 
+            color: white; border-radius: 50%; display: flex; 
+            justify-content: center; align-items: center; cursor: pointer; font-size: 24px;
         }
-        #chat-toggle:hover { transform: scale(1.1) rotate(5deg); background: var(--accent); }
-
-        #chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; background: #f8fafc; }
-
-        /* --- MODAL --- */
-        .modal-content { border-radius: 30px; border: none; overflow: hidden; }
-        .modal-header { padding: 25px 30px; border-bottom: 1px solid #f1f5f9; }
-        .btn-success { border-radius: 50px; background: #22c55e; border: none; padding: 12px 25px; }
-        .btn-outline-primary { border-radius: 50px; border-color: var(--primary); color: var(--primary); }
     </style>
 </head>
 <body>
 
-    <header class="hero-header">
-        <div class="container">
-            <div class="brand-logo">BILDUNG<span>digital</span></div>
-            <input type="text" id="searchInput" class="form-control" placeholder="Entdecke deine Lerninhalte...">
+    <nav class="navbar">
+        <div class="container d-flex justify-content-between">
+            <h3 class="m-0">BILDUNGdigital</h3>
+            <input type="text" id="searchInput" class="form-control w-25" placeholder="Suche...">
         </div>
-    </header>
+    </nav>
 
-    <main class="container py-5">
-        <div id="posts-container" class="row g-4">
-            <div class="col-12 text-center py-5">
-                <div class="spinner-grow text-primary" role="status"></div>
-                <p class="mt-3 text-muted">Lade Portal...</p>
-            </div>
+    <div class="container">
+        <div id="posts-container" class="row">
+            <div class="col-12 text-center">Lade Kacheln...</div>
         </div>
-    </main>
+    </div>
 
     <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content shadow-2xl">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Inhalt</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                    <h5 class="modal-title" id="modalTitle">Inhalt</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4" id="modalTextContent"></div>
-                <div id="modalFooter" class="modal-footer border-0 d-block text-center pb-4"></div>
+                <div class="modal-body" id="modalTextContent"></div>
+                <div class="modal-footer" id="modalFooter"></div>
             </div>
         </div>
     </div>
 
     <div id="ai-chat-window">
-        <div style="background:var(--primary); color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
-            <span class="fw-bold">🤖 KI-Assistent</span>
-            <button onclick="window.toggleChat()" class="btn-close btn-close-white"></button>
+        <div style="background:#003366; color:white; padding:10px; display:flex; justify-content:space-between;">
+            <span>KI Chat</span>
+            <button onclick="window.toggleChat()" style="background:none; border:none; color:white;">X</button>
         </div>
-        <div id="chat-messages"></div>
-        <div class="p-3 bg-white border-top d-flex">
-            <input type="text" id="chatInput" class="form-control rounded-pill border-light bg-light" placeholder="Frage stellen...">
-            <button onclick="window.sendChatMessage()" class="btn btn-primary rounded-pill ms-2 px-4">OK</button>
+        <div id="chat-messages" style="flex-grow:1; overflow-y:auto; padding:10px;"></div>
+        <div style="padding:10px; border-top:1px solid #ccc; display:flex;">
+            <input type="text" id="chatInput" style="flex-grow:1;">
+            <button onclick="window.sendChatMessage()">OK</button>
         </div>
     </div>
 
-    <div id="chat-toggle" onclick="window.toggleChat()">💬</div>
+    <div id="chat-toggle-btn" onclick="window.toggleChat()">💬</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
