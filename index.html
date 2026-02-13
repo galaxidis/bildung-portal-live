@@ -3,171 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILDUNGdigital | Portal 2026</title>
-    
+    <title>BILDUNGdigital | Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    
     <style>
-        :root {
-            --primary-blue: #003366;
-            --accent-blue: #00aaff;
-            --bg-body: #f4f7fa;
-            --card-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            --hover-shadow: 0 20px 40px rgba(0,0,0,0.12);
+        body { background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, sans-serif; color: #334155; }
+        
+        /* Header & Runde Suche */
+        .navbar { background-color: #003366; padding: 25px 0; margin-bottom: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .brand-name { color: white; font-weight: 800; font-size: 1.8rem; text-decoration: none; }
+        .brand-name span { color: #00aaff; }
+
+        #searchInput { 
+            border-radius: 50px; /* RUNDE SUCHE */
+            border: 2px solid transparent;
+            padding: 12px 25px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: 0.3s;
         }
+        #searchInput:focus { outline: none; border-color: #00aaff; transform: scale(1.02); }
 
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-body);
-            color: #2d3748;
-        }
-
-        /* --- Header & Runde Suche --- */
-        .header-section {
-            background: white;
-            padding: 40px 0;
-            border-bottom: 1px solid #e2e8f0;
-            text-align: center;
-        }
-
-        .brand-logo {
-            font-weight: 800;
-            font-size: 2.2rem;
-            color: var(--primary-blue);
-            text-transform: uppercase;
-            letter-spacing: -1px;
-            margin-bottom: 25px;
-        }
-
-        .brand-logo span { color: var(--accent-blue); }
-
-        .search-wrapper {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        #searchInput {
-            border-radius: 50px; /* RUNDE SUCHLEISTE */
-            padding: 15px 30px;
-            border: 2px solid #edf2f7;
-            background: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-        }
-
-        #searchInput:focus {
-            outline: none;
-            border-color: var(--accent-blue);
-            box-shadow: 0 10px 25px rgba(0,170,255,0.15);
-        }
-
-        /* --- Schwebende Kacheln --- */
-        .card {
-            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-            border: none !important;
-            box-shadow: var(--card-shadow);
-        }
-
-        .card:hover {
-            transform: translateY(-12px); /* SCHWEBENDER EFFEKT */
-            box-shadow: var(--hover-shadow);
-        }
-
-        .card-img-top {
-            transition: transform 0.6s ease;
-        }
-
-        .card:hover .card-img-top {
-            transform: scale(1.08); /* Minimaler Bild-Zoom */
-        }
-
-        .btn-outline-primary {
-            border-color: var(--primary-blue);
-            color: var(--primary-blue);
-        }
-
-        .btn-outline-primary:hover {
-            background-color: var(--primary-blue);
-            color: white;
-        }
-
-        /* --- Modal Design --- */
-        .modal-content {
-            border-radius: 30px;
-            border: none;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-
-        .modal-header {
-            background: #fff;
-            padding: 25px 30px;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        .modal-body { padding: 30px; }
-
-        /* --- Chat Bot Toggle (Dezenter Button) --- */
-        #chat-toggle {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background: var(--primary-blue);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        /* Schwebende Kacheln */
+        .card { 
+            transition: all 0.3s ease-out; 
+            border: none; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); 
             cursor: pointer;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            z-index: 1000;
-            font-size: 24px;
-            transition: all 0.3s ease;
+        }
+        .card:hover { 
+            transform: translateY(-12px); /* SCHWEBEN */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
         }
 
-        #chat-toggle:hover { transform: scale(1.1); }
+        /* Modal Design */
+        .modal-content { border-radius: 25px; border: none; overflow: hidden; }
+        .modal-header { background: #f8fafc; border-bottom: none; padding: 20px 30px; }
+        .modal-footer { border-top: none; padding: 20px 30px; }
+        
+        .btn-success { background-color: #27ae60; border: none; border-radius: 50px; }
+        .btn-outline-primary { border-radius: 50px; border-color: #003366; color: #003366; }
     </style>
 </head>
 <body>
 
-    <header class="header-section">
-        <div class="container">
-            <div class="brand-logo">Bildung<span>digital</span></div>
-            <div class="search-wrapper">
-                <input type="text" id="searchInput" class="form-control" placeholder="Thema oder H5P suchen...">
-            </div>
+    <nav class="navbar">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <a href="#" class="brand-name">BILDUNG<span>digital</span></a>
+            <input type="text" id="searchInput" class="form-control w-50" placeholder="Was möchtest du lernen?">
         </div>
-    </header>
+    </nav>
 
-    <main class="container py-5">
-        <div id="posts-container" class="row">
+    <div class="container">
+        <div id="posts-container" class="row g-4">
             <div class="col-12 text-center py-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-3 text-muted">Inhalte werden geladen...</p>
-            </div>
-        </div>
-    </main>
-
-    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Beitrag</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="modalTextContent">
-                    </div>
-                <div class="modal-footer border-0 p-4" id="modalFooter">
-                    </div>
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-2 text-muted">Inhalte werden geladen...</p>
             </div>
         </div>
     </div>
 
-    <div id="chat-toggle" onclick="alert('KI Chat ist in Vorbereitung!')">💬</div>
+    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="modalTitle">Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalTextContent" style="line-height: 1.6;"></div>
+                <div class="modal-footer d-block" id="modalFooter"></div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
