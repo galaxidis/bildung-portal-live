@@ -3,45 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILDUNGdigital</title>
+    <title>BILDUNGdigital | Portal</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
+    
     <style>
-        body { background-color: #f1f1f1; padding-top: 20px; }
-        .navbar { background-color: #003366; margin-bottom: 30px; padding: 15px; color: white; }
-        .card { margin-bottom: 20px; }
-        #ai-chat-window { 
-            position: fixed; bottom: 80px; right: 20px; 
-            width: 300px; height: 400px; background: white; 
-            border: 2px solid #003366; display: none; flex-direction: column; z-index: 9999;
+        /* Hier steckt das Design */
+        body {
+            background-color: #f0f2f5;
+            font-family: sans-serif;
+            color: #1a202c;
         }
-        #chat-toggle-btn { 
-            position: fixed; bottom: 20px; right: 20px; 
-            width: 50px; height: 50px; background: #003366; 
-            color: white; border-radius: 50%; display: flex; 
-            justify-content: center; align-items: center; cursor: pointer; font-size: 24px;
+
+        .header-area {
+            background: white;
+            padding: 40px 0;
+            border-bottom: 2px solid #e2e8f0;
+            text-align: center;
+            margin-bottom: 30px;
         }
+
+        .brand-title {
+            font-weight: bold;
+            font-size: 2.5rem;
+            color: #003366;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        #searchInput {
+            max-width: 500px;
+            margin: 0 auto;
+            border-radius: 25px;
+            border: 2px solid #cbd5e0;
+            padding: 12px 20px;
+        }
+
+        /* Kachel Design */
+        .content-card {
+            background: white;
+            border-radius: 15px;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-img-top {
+            height: 180px;
+            object-fit: cover;
+        }
+
+        .card-body {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            color: #003366;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+        }
+
+        /* Chat Button */
+        #chat-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #003366;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            font-size: 24px;
+        }
+
+        /* Chat Fenster */
+        #ai-chat-window {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 450px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .chat-head {
+            background: #003366;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f7fafc;
+        }
+
+        .chat-input-box {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+        }
+
+        /* Modal Radius */
+        .modal-content { border-radius: 20px; }
     </style>
 </head>
 <body>
 
-    <nav class="navbar">
-        <div class="container d-flex justify-content-between">
-            <h3 class="m-0">BILDUNGdigital</h3>
-            <input type="text" id="searchInput" class="form-control w-25" placeholder="Suche...">
+    <header class="header-area">
+        <div class="container">
+            <div class="brand-title">BILDUNGdigital</div>
+            <input type="text" id="searchInput" class="form-control" placeholder="Inhalte durchsuchen...">
         </div>
-    </nav>
+    </header>
 
     <div class="container">
-        <div id="posts-container" class="row">
-            <div class="col-12 text-center">Lade Kacheln...</div>
+        <div id="posts-container" class="row g-4">
+            <div class="col-12 text-center py-5">
+                <p>Inhalte werden geladen...</p>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade" id="contentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="modalTitle">Inhalt</h5>
+                    <h5 class="modal-title fw-bold" id="modalTitle">Details</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="modalTextContent"></div>
@@ -51,18 +167,18 @@
     </div>
 
     <div id="ai-chat-window">
-        <div style="background:#003366; color:white; padding:10px; display:flex; justify-content:space-between;">
-            <span>KI Chat</span>
-            <button onclick="window.toggleChat()" style="background:none; border:none; color:white;">X</button>
+        <div class="chat-head">
+            <span>KI Assistent</span>
+            <button onclick="window.toggleChat()" class="btn btn-sm btn-close btn-close-white"></button>
         </div>
-        <div id="chat-messages" style="flex-grow:1; overflow-y:auto; padding:10px;"></div>
-        <div style="padding:10px; border-top:1px solid #ccc; display:flex;">
-            <input type="text" id="chatInput" style="flex-grow:1;">
-            <button onclick="window.sendChatMessage()">OK</button>
+        <div id="chat-messages"></div>
+        <div class="chat-input-box">
+            <input type="text" id="chatInput" class="form-control" placeholder="Frag mich was...">
+            <button onclick="window.sendChatMessage()" class="btn btn-primary ms-2">OK</button>
         </div>
     </div>
 
-    <div id="chat-toggle-btn" onclick="window.toggleChat()">💬</div>
+    <div id="chat-toggle" onclick="window.toggleChat()">💬</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
