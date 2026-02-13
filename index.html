@@ -4,121 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BILDUNGdigital | Portal</title>
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
-    
     <style>
-        /* GLOBALER RESET */
-        * { box-sizing: border-box; }
-        body { background-color: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
-
-        .header-section {
-            padding: 40px 0;
-            background: white;
-            border-bottom: 1px solid #e2e8f0;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
+        body { background-color: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .header-section { padding: 40px 0; background: white; border-bottom: 1px solid #e2e8f0; text-align: center; margin-bottom: 30px; }
         .brand { font-weight: 800; font-size: 2.2rem; color: #003366; }
         .brand span { color: #00aaff; }
-
-        /* ERZWUNGENES GRID-LAYOUT */
-        .row {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            margin-right: -15px;
-            margin-left: -15px;
-        }
-
-        /* Die Spalten: 33.33% Breite auf Desktop */
-        .post-card-container {
-            width: 33.333% !important; /* Erzwingt 3 Spalten */
-            padding: 15px;
-            display: flex;
-        }
-
-        /* Responsive: 2 Spalten auf Tablet, 1 auf Handy */
-        @media (max-width: 992px) { .post-card-container { width: 50% !important; } }
-        @media (max-width: 576px) { .post-card-container { width: 100% !important; } }
-
-        .card { 
-            border: none !important; 
-            border-radius: 16px; 
-            overflow: hidden; 
-            background: white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.2s ease;
-        }
-        .card:hover { transform: translateY(-5px); }
-
-        /* BILD-GRÖSSE ABSOLUT FIXIEREN */
-        .img-box {
-            width: 100% !important;
-            height: 180px !important; /* Hier wird die Höhe fixiert */
-            overflow: hidden !important;
-            background: #cbd5e1;
-        }
-
-        .card-img-top { 
-            width: 100% !important; 
-            height: 100% !important; 
-            object-fit: cover !important; /* Bild wird passend beschnitten */
-            display: block;
-        }
-
-        .card-body {
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-        }
-
-        .card-title { font-size: 1.1rem; font-weight: 700; color: #003366; margin-bottom: 1rem; }
         
-        .btn-pill { border-radius: 50px; padding: 10px 15px; font-weight: 700; font-size: 0.85rem; text-decoration: none; text-align: center; }
-        .btn-success { background: #22c55e; border: none; color: white !important; }
-        .btn-outline-primary { border: 1px solid #003366; color: #003366; }
+        /* GRID FIX */
+        #posts-container { display: flex; flex-wrap: wrap; margin: 0 -10px; }
+        .post-card-container { width: 33.33%; padding: 10px; display: flex; }
+        @media (max-width: 992px) { .post-card-container { width: 50%; } }
+        @media (max-width: 576px) { .post-card-container { width: 100%; } }
 
+        .card { border: none; border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); width: 100%; display: flex; flex-direction: column; }
+        .img-box { width: 100%; height: 180px; overflow: hidden; background: #cbd5e1; }
+        .card-img-top { width: 100%; height: 100%; object-fit: cover; }
+        .card-body { padding: 1.25rem; display: flex; flex-direction: column; flex-grow: 1; }
+        .card-title { font-size: 1.1rem; font-weight: 700; color: #003366; min-height: 3rem; margin-bottom: 1rem; }
+        .btn-pill { border-radius: 50px; padding: 10px 15px; font-weight: 700; font-size: 0.85rem; border: none; }
+        .btn-success { background: #22c55e; color: white !important; }
+        .btn-outline-primary { border: 1px solid #003366; color: #003366; background: transparent; }
+        
+        /* MODAL FIX */
+        .modal-xl { max-width: 95%; }
         .modal-content { border-radius: 20px; border: none; }
     </style>
 </head>
 <body>
-
     <header class="header-section">
         <div class="container">
             <div class="brand">BILDUNG<span>digital</span></div>
             <div class="search-container mt-3" style="max-width: 500px; margin: 0 auto;">
-                <input type="text" id="searchInput" class="form-control" style="border-radius: 50px;" placeholder="Suchen...">
+                <input type="text" id="searchInput" class="form-control rounded-pill" placeholder="Suchen...">
             </div>
         </div>
     </header>
-
     <main class="container">
-        <div id="posts-container" class="row">
-            <div class="col-12 text-center py-5">
-                <div class="spinner-border text-primary"></div>
-                <p>Inhalte werden geladen...</p>
-            </div>
+        <div id="posts-container">
+            <div class="col-12 text-center py-5">Inhalte werden geladen...</div>
         </div>
     </main>
-
     <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content shadow-lg">
-                <div class="modal-header border-0 pb-0">
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4 pt-0" id="modalTextContent"></div>
+                <div class="modal-header border-0 pb-0"><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div id="modalTextContent" class="modal-body p-4 pt-0"></div>
                 <div id="modalFooter" class="modal-footer border-0 d-block text-center pb-4"></div>
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
