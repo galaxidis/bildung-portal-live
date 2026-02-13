@@ -7,13 +7,12 @@ async function fetchPosts() {
         const posts = await res.json();
         
         container.innerHTML = posts.map(post => {
-            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
+            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
-            // col-md-4 sorgt für 3 Kacheln nebeneinander auf dem Desktop
             return `
-                <div class="col-12 col-sm-6 col-md-4 post-card-container">
-                    <div class="card">
+                <div class="post-card-container">
+                    <div class="card h-100">
                         <div class="img-box">
                             <img src="${media}" class="card-img-top">
                         </div>
@@ -28,18 +27,18 @@ async function fetchPosts() {
                 </div>`;
         }).join('');
     } catch (e) {
-        container.innerHTML = "Fehler beim Laden.";
+        container.innerHTML = "<div class='col-12 text-center'>Inhalte konnten nicht geladen werden.</div>";
     }
 }
 
-// Öffnen-Logik
+// EXPLIZIT GLOBAL MACHEN, damit onclick funktioniert
 window.openContent = async function(postId, directH5P) {
     const modalEl = document.getElementById('contentModal');
     const bModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    body.innerHTML = "Wird geladen...";
+    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
     footer.innerHTML = "";
     bModal.show();
 
@@ -50,19 +49,31 @@ window.openContent = async function(postId, directH5P) {
         let h5pId = null;
         if (post._embedded?.['wp:term']) {
             const tags = post._embedded['wp:term'][1] || [];
-            const idTag = tags.find(t => !isNaN(t.name));
-            if (idTag) h5pId = idTag.name;
+            // Suche nach einem Tag, der nur aus Zahlen besteht (H5P ID)
+            const idTag = tags.find(t => !isNaN(t.name.trim()));
+            if (idTag) h5pId = idTag.name.trim();
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `<div class="ratio ratio-16x9"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" allowfullscreen></iframe></div>`;
+            // H5P MODUS
+            body.innerHTML = `
+                <div class="ratio ratio-16x9">
+                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
+                            allowfullscreen style="border:0; width:100%; height:100%;"></iframe>
+                </div>`;
         } else {
-            body.innerHTML = `<h3>${post.title.rendered}</h3><hr>${post.content.rendered}`;
+            // DETAILS MODUS
+            body.innerHTML = `
+                <h3 class="fw-bold mb-3">${post.title.rendered}</h3>
+                <div class="post-text">${post.content.rendered}</div>`;
+            
             if (h5pId) {
-                footer.innerHTML = `<button onclick="openContent(${post.id}, true)" class="btn btn-success btn-pill w-100 py-3">🚀 Übung jetzt öffnen</button>`;
+                footer.innerHTML = `<button onclick="openContent(${post.id}, true)" class="btn btn-success btn-pill w-100 py-3">🚀 Jetzt Übung starten</button>`;
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { 
+        body.innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Daten.</div>'; 
+    }
 };
 
 document.addEventListener('DOMContentLoaded', fetchPosts);
