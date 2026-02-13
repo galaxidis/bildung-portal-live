@@ -1,5 +1,5 @@
 /**
- * BILDUNGdigital - STABILE VERSION MIT LINKS & CHAT
+ * BILDUNGdigital - VOLLVERSION MIT H5P-LINKS & CHAT
  */
 
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
@@ -7,6 +7,7 @@ const GEMINI_API_KEY = 'DEIN_KEY_HIER'; // <-- BITTE HIER DEINEN PROFI-KEY EINSE
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let allPosts = [];
+let currentH5PId = null;
 
 // --- 1. KACHELN LADEN & ANZEIGEN ---
 async function fetchPosts() {
@@ -26,8 +27,10 @@ function displayPosts(posts) {
     if (!container) return;
 
     container.innerHTML = posts.map(post => {
-        // Bild-Suche (Falls kein Bild da ist, wird ein Platzhalter genutzt)
         const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
+        
+        // Prüfen, ob H5P im Inhalt vorkommt
+        const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
         
         return `
             <div class="col-md-4 mb-4">
@@ -37,8 +40,10 @@ function displayPosts(posts) {
                     </div>
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title fw-bold" style="color:#003366;">${post.title.rendered}</h5>
-                        <div class="mt-auto pt-3">
-                            <button onclick="window.openContent(${post.id})" class="btn btn-primary w-100 rounded-pill fw-bold">Ansehen</button>
+                        <div class="mt-auto pt-3 d-flex gap-2">
+                            <button onclick="window.openContent(${post.id}, false)" class="btn btn-sm btn-outline-primary px-3 rounded-pill">Details</button>
+                            
+                            ${hasH5P ? `<button onclick="window.openContent(${post.id}, true)" class="btn btn-sm btn-success px-3 rounded-pill">🚀 H5P Start</button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -46,89 +51,46 @@ function displayPosts(posts) {
     }).join('');
 }
 
-// --- 2. MODAL ÖFFNEN (Der Inhalt der Kachel) ---
-window.openContent = async function(postId) {
+// --- 2. MODAL ÖFFNEN & H5P LOGIK ---
+window.openContent = async function(postId, directH5P = false) {
     const modalEl = document.getElementById('contentModal');
-    if (!modalEl) return;
-    
-    const modal = new bootstrap.Modal(modalEl);
     const body = document.getElementById('modalTextContent');
     const title = document.getElementById('modalTitle');
+    const footer = document.getElementById('modalFooter');
 
-    if (body) body.innerHTML = 'Inhalt wird geladen...';
+    if (!modalEl) return;
+    const modal = new bootstrap.Modal(modalEl);
+
+    if (body) body.innerHTML = 'Lädt...';
+    if (footer) footer.innerHTML = "";
+    currentH5PId = null;
     modal.show();
 
     try {
-        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}`);
+        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         if (title) title.innerText = post.title.rendered;
-        if (body) body.innerHTML = post.content.rendered;
-    } catch (e) {
-        if (body) body.innerHTML = "Fehler beim Laden des Beitrags.";
-    }
-};
 
-// --- 3. CHAT-LOGIK ---
-window.toggleChat = function() {
-    const chatWindow = document.getElementById('ai-chat-window');
-    if (chatWindow) {
-        chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
-    }
-};
+        // ID aus den Tags extrahieren
+        if (post._embedded && post._embedded['wp:term']) {
+            const tags = post._embedded['wp:term'][1]; 
+            if (tags) {
+                const idTag = tags.find(t => !isNaN(t.name)); 
+                if (idTag) currentH5PId = idTag.name;
+            }
+        }
 
-window.sendChatMessage = async function() {
-    const input = document.getElementById('chatInput');
-    const container = document.getElementById('chat-messages');
-    if (!input || !input.value.trim()) return;
-
-    const userText = input.value;
-    input.value = "";
-
-    // Nachricht im Chat anzeigen
-    const uMsg = document.createElement('div');
-    uMsg.style.cssText = "background:#003366; color:white; padding:10px; border-radius:10px; margin:5px 0 5px auto; max-width:85%; font-size:0.9rem;";
-    uMsg.innerText = userText;
-    container.appendChild(uMsg);
-
-    const aiMsg = document.createElement('div');
-    aiMsg.style.cssText = "background:#f8f9fa; color:#333; padding:10px; border-radius:10px; margin:5px auto 5px 0; max-width:85%; font-size:0.9rem; border:1px solid #ddd;";
-    aiMsg.innerText = "...";
-    container.appendChild(aiMsg);
-    container.scrollTop = container.scrollHeight;
-
-    try {
-        const response = await fetch(GEMINI_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: userText }] }] })
-        });
-        const data = await response.json();
-        
-        if (data.error) {
-            aiMsg.innerText = "Fehler: " + data.error.message;
-        } else if (data.candidates && data.candidates[0].content) {
-            aiMsg.innerText = data.candidates[0].content.parts[0].text;
+        if (directH5P && currentH5PId) {
+            window.launchH5P();
         } else {
-            aiMsg.innerText = "Die KI konnte keine Antwort generieren.";
+            if (body) body.innerHTML = post.content.rendered;
+            if (currentH5PId && footer) {
+                footer.innerHTML = `<button onclick="window.launchH5P()" class="btn btn-success w-100 py-2 fw-bold">🚀 Übung jetzt öffnen</button>`;
+            }
         }
     } catch (e) {
-        aiMsg.innerText = "Verbindung zur KI unterbrochen.";
+        if (body) body.innerHTML = "Fehler beim Laden.";
     }
-    container.scrollTop = container.scrollHeight;
 };
 
-// --- 4. STARTBEFEHLE ---
-document.addEventListener('DOMContentLoaded', () => {
-    fetchPosts();
-
-    // Suche aktivieren
-    document.getElementById('searchInput')?.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        displayPosts(allPosts.filter(p => p.title.rendered.toLowerCase().includes(term)));
-    });
-
-    // Enter-Taste im Chat
-    document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') window.sendChatMessage();
-    });
-});
+window.launchH5P = function() {
