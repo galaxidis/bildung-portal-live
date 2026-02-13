@@ -2,10 +2,18 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
+    if (!container) return;
+
     try {
         const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Netzwerk-Antwort war nicht ok");
         const posts = await res.json();
         
+        if (posts.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center">Keine Beiträge gefunden.</div>';
+            return;
+        }
+
         container.innerHTML = posts.map(post => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
@@ -27,18 +35,21 @@ async function fetchPosts() {
                 </div>`;
         }).join('');
     } catch (e) {
-        container.innerHTML = "Fehler beim Laden.";
+        console.error("API Fehler:", e);
+        container.innerHTML = `<div class="col-12 text-center text-danger py-5">
+            <b>Fehler beim Laden:</b> Bitte prüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.
+        </div>`;
     }
 }
 
-// DAS HIER FIXT DIE LINKS:
+// GLOBALER SCOPE FÜR LINKS
 window.openContent = async function(postId, directH5P) {
     const modalEl = document.getElementById('contentModal');
     const bModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Inhalt wird geladen...</p></div>';
     footer.innerHTML = "";
     bModal.show();
 
@@ -46,6 +57,7 @@ window.openContent = async function(postId, directH5P) {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         
+        // H5P ID finden (Tag muss eine Nummer sein)
         let h5pId = null;
         if (post._embedded?.['wp:term']) {
             const tags = post._embedded['wp:term'][1] || [];
@@ -60,16 +72,20 @@ window.openContent = async function(postId, directH5P) {
                             allowfullscreen style="border:0; width:100%; height:100%;"></iframe>
                 </div>`;
         } else {
-            body.innerHTML = `<h3>${post.title.rendered}</h3><hr><div>${post.content.rendered}</div>`;
+            body.innerHTML = `<h3 class="fw-bold mb-3">${post.title.rendered}</h3><hr><div>${post.content.rendered}</div>`;
             if (h5pId) {
                 footer.innerHTML = `<button onclick="window.openContent(${post.id}, true)" class="btn btn-success btn-pill w-100 py-3">🚀 Übung jetzt öffnen</button>`;
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { 
+        body.innerHTML = '<div class="alert alert-danger">Fehler beim Laden des Inhalts.</div>'; 
+    }
 };
 
+// INITIALISIERUNG
 document.addEventListener('DOMContentLoaded', fetchPosts);
 
+// SUCHE
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('.post-card-container').forEach(el => {
