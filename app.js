@@ -2,65 +2,54 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
-    if (!container) return;
-
     try {
-        console.log("Lade Daten von API...");
         const res = await fetch(API_URL);
-        if (!res.ok) throw new Error("API nicht erreichbar");
         const posts = await res.json();
-        
-        container.innerHTML = ""; // Spinner entfernen
+        container.innerHTML = ""; // Spinner weg
 
         posts.forEach(post => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
-            const col = document.createElement('div');
-            col.className = 'post-card-container';
-            col.innerHTML = `
-                <div class="card h-100">
-                    <div class="img-box">
-                        <img src="${media}" class="card-img-top" loading="lazy">
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">${post.title.rendered}</h5>
-                        <div class="mt-auto d-flex gap-2">
-                            <button class="btn btn-outline-primary btn-pill flex-fill btn-details">Details</button>
-                            ${hasH5P ? `<button class="btn btn-success btn-pill flex-fill text-white btn-start">🚀 Start</button>` : ''}
+            const cardHtml = `
+                <div class="post-card-container">
+                    <div class="card h-100">
+                        <div class="img-box"><img src="${media}" class="card-img-top"></div>
+                        <div class="card-body">
+                            <h5 class="card-title">${post.title.rendered}</h5>
+                            <div class="mt-auto d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-pill flex-fill view-details">Details</button>
+                                ${hasH5P ? `<button class="btn btn-success btn-pill flex-fill text-white launch-h5p">🚀 Start</button>` : ''}
+                            </div>
                         </div>
                     </div>
                 </div>`;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = cardHtml;
+            const cardElement = tempDiv.firstElementChild;
 
-            // Event Listener direkt hinzufügen (sicherer als onclick im HTML)
-            col.querySelector('.btn-details').addEventListener('click', () => window.openContent(post.id, false));
+            // Klicks direkt binden
+            cardElement.querySelector('.view-details').onclick = () => window.openContent(post.id, false);
             if (hasH5P) {
-                col.querySelector('.btn-start').addEventListener('click', () => window.openContent(post.id, true));
+                cardElement.querySelector('.launch-h5p').onclick = () => window.openContent(post.id, true);
             }
 
-            container.appendChild(col);
+            container.appendChild(cardElement);
         });
     } catch (e) {
-        console.error("Fehler im fetchPosts:", e);
-        container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Fehler beim Laden der Inhalte.</div>`;
+        container.innerHTML = "API Fehler.";
     }
 }
 
-// Global verfügbare Funktion für das Modal
 window.openContent = async function(postId, directH5P) {
-    console.log("Öffne Inhalt für ID:", postId);
     const modalEl = document.getElementById('contentModal');
+    const bModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
-
-    if (!modalEl || !body) return;
-
-    // Spinner im Modal zeigen
-    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    
+    body.innerHTML = "Lädt...";
     footer.innerHTML = "";
-
-    // Modal anzeigen
-    const bModal = new bootstrap.Modal(modalEl);
     bModal.show();
 
     try {
@@ -75,25 +64,18 @@ window.openContent = async function(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `
-                <div class="ratio ratio-16x9">
-                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                            allowfullscreen style="border:0;"></iframe>
-                </div>`;
+            body.innerHTML = `<div class="ratio ratio-16x9"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" allowfullscreen style="border:0;"></iframe></div>`;
         } else {
-            body.innerHTML = `<h3 class="fw-bold mb-3">${post.title.rendered}</h3><div class="content-text">${post.content.rendered}</div>`;
+            body.innerHTML = `<h3>${post.title.rendered}</h3><hr>${post.content.rendered}`;
             if (h5pId) {
-                footer.innerHTML = `<button onclick="window.openContent(${post.id}, true)" class="btn btn-success btn-pill w-100 py-3">🚀 Jetzt Übung öffnen</button>`;
+                footer.innerHTML = `<button onclick="window.openContent(${post.id}, true)" class="btn btn-success btn-pill w-100 py-3">🚀 Starten</button>`;
             }
         }
-    } catch (e) {
-        body.innerHTML = "Fehler beim Laden der Details.";
-    }
+    } catch (e) { body.innerHTML = "Fehler."; }
 };
 
 document.addEventListener('DOMContentLoaded', fetchPosts);
 
-// Suchfunktion
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('.post-card-container').forEach(el => {
