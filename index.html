@@ -3,113 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BILDUNGdigital Portal</title>
+    <title>BILDUNGdigital</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
-    
     <style>
-        /* Klassisches Design wie am Anfang */
-        body { 
-            background-color: #f8f9fa; 
-            font-family: Arial, sans-serif; 
-        }
-        
-        .navbar { 
-            background-color: #003366; 
-            color: white; 
-            padding: 1rem; 
-            margin-bottom: 2rem;
-        }
-
-        .card { 
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            height: 100%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .card-img-top { 
-            height: 180px; 
-            object-fit: cover; 
-        }
-
-        /* Chat Fenster */
+        body { background-color: #f1f1f1; padding-top: 20px; }
+        .navbar { background-color: #003366; margin-bottom: 30px; padding: 15px; color: white; }
+        .card { margin-bottom: 20px; }
         #ai-chat-window { 
-            position: fixed; 
-            bottom: 80px; 
-            right: 20px; 
-            width: 350px; 
-            height: 450px; 
-            background: white; 
-            border: 1px solid #003366;
-            border-radius: 10px; 
-            display: none; 
-            flex-direction: column; 
-            z-index: 1000; 
+            position: fixed; bottom: 80px; right: 20px; 
+            width: 300px; height: 400px; background: white; 
+            border: 2px solid #003366; display: none; flex-direction: column; z-index: 9999;
         }
-
-        /* Chat Toggle Button */
         #chat-toggle-btn { 
-            position: fixed; 
-            bottom: 20px; 
-            right: 20px; 
-            width: 50px; 
-            height: 50px; 
-            background: #003366; 
-            color: white; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: pointer; 
-            z-index: 1001;
-            font-size: 20px;
-        }
-
-        #chat-messages { 
-            flex-grow: 1; 
-            padding: 10px; 
-            overflow-y: auto; 
-            font-size: 0.9rem;
+            position: fixed; bottom: 20px; right: 20px; 
+            width: 50px; height: 50px; background: #003366; 
+            color: white; border-radius: 50%; display: flex; 
+            justify-content: center; align-items: center; cursor: pointer; font-size: 24px;
         }
     </style>
 </head>
 <body>
 
-    <nav class="navbar text-white">
-        <div class="container d-flex justify-content-between align-items-center">
-            <h2 class="m-0">BILDUNGdigital</h2>
+    <nav class="navbar">
+        <div class="container d-flex justify-content-between">
+            <h3 class="m-0">BILDUNGdigital</h3>
             <input type="text" id="searchInput" class="form-control w-25" placeholder="Suche...">
         </div>
     </nav>
 
     <div class="container">
-        <div id="posts-container" class="row g-4">
-            <div class="col-12 text-center">Inhalte werden geladen...</div>
+        <div id="posts-container" class="row">
+            <div class="col-12 text-center">Lade Kacheln...</div>
         </div>
     </div>
 
-    <div class="modal fade" id="contentModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title font-weight-bold" id="modalTitle">Beitrag</h5>
+                    <h5 class="modal-title" id="modalTitle">Inhalt</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="modalTextContent"></div>
-                <div id="modalFooter" class="modal-footer d-block text-center"></div>
+                <div class="modal-footer" id="modalFooter"></div>
             </div>
         </div>
     </div>
 
     <div id="ai-chat-window">
         <div style="background:#003366; color:white; padding:10px; display:flex; justify-content:space-between;">
-            <span>KI-Chat</span>
-            <button onclick="window.toggleChat()" class="btn-close btn-close-white"></button>
+            <span>KI Chat</span>
+            <button onclick="window.toggleChat()" style="background:none; border:none; color:white;">X</button>
         </div>
-        <div id="chat-messages"></div>
-        <div class="p-2 border-top d-flex">
-            <input type="text" id="chatInput" class="form-control" placeholder="Frage...">
-            <button onclick="window.sendChatMessage()" class="btn btn-primary ms-1">Senden</button>
+        <div id="chat-messages" style="flex-grow:1; overflow-y:auto; padding:10px;"></div>
+        <div style="padding:10px; border-top:1px solid #ccc; display:flex;">
+            <input type="text" id="chatInput" style="flex-grow:1;">
+            <button onclick="window.sendChatMessage()">OK</button>
         </div>
     </div>
 
