@@ -1,11 +1,12 @@
 /**
  * HUB BILDUNG DIGITAL - MASTER APP SCRIPT
  * Integration: WordPress REST API, H5P Embed & Groq AI Chat
+ * Fix: Model Deprecation Llama 3 -> Llama 3.1
  */
 
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const AI_API_KEY = "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"; 
-const AI_MODEL = "llama-3.3-70b-versatile"; // Aktuelles Groq Modell
+const AI_MODEL = "llama-3.1-8b-instant"; // Das aktuelle, unterstützte Modell
 
 // 1. MODAL-STEUERUNG
 function closeModal() {
@@ -16,7 +17,7 @@ function closeModal() {
     }
 }
 
-// 2. KACHELN LADEN & H5P-LOGIK
+// 2. KACHELN LADEN
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -54,7 +55,7 @@ async function fetchPosts() {
     }
 }
 
-// 3. INHALT IM MODAL ANZEIGEN
+// 3. MODAL INHALT
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
@@ -74,7 +75,6 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // H5P Direkt-Iframe
             body.innerHTML = `
                 <div class="w-full h-[75vh]">
                     <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
@@ -82,7 +82,6 @@ async function openContent(postId, directH5P) {
                             allowfullscreen></iframe>
                 </div>`;
         } else {
-            // Normaler Post Content
             body.innerHTML = `
                 <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
                 <div class="prose max-w-none text-slate-700 font-sans">
@@ -90,31 +89,27 @@ async function openContent(postId, directH5P) {
                 </div>`;
         }
     } catch (e) {
-        body.innerHTML = `<div class="p-10 text-red-500">Inhalt konnte nicht geladen werden.</div>`;
+        body.innerHTML = `<div class="p-10 text-red-500">Fehler beim Laden.</div>`;
     }
 }
 
-// 4. KI CHAT-BOT (Groq Engine)
+// 4. KI CHAT-BOT (Groq Llama 3.1)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
     const msgs = document.getElementById('chat-messages');
 
-    // Chat UI Toggle
     document.getElementById('chat-toggle').onclick = () => win.classList.toggle('hidden');
     document.getElementById('close-chat').onclick = () => win.classList.add('hidden');
 
-    // Kern-Funktion für API-Anfrage
     async function askAI(question) {
         if (!question || !question.trim()) return;
         
-        // Nutzer-Nachricht anzeigen
         const userMsg = document.createElement('div');
         userMsg.className = "bg-slate-100 p-2 rounded-lg mb-2 text-xs text-slate-600 self-end ml-auto max-w-[80%]";
         userMsg.innerText = question;
         msgs.appendChild(userMsg);
 
-        // KI-Lade-Platzhalter
         const aiMsg = document.createElement('div');
         aiMsg.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
         aiMsg.innerText = "KI schreibt...";
@@ -133,45 +128,40 @@ function initChat() {
                 body: JSON.stringify({
                     model: AI_MODEL,
                     messages: [
-                        { role: "system", content: "Du bist ein hilfreicher Assistent für digitales Lernen. Antworte präzise und kurz auf Deutsch." },
+                        { role: "system", content: "Du bist ein hilfreicher Lern-Assistent. Antworte kurz und knackig auf Deutsch." },
                         { role: "user", content: question }
-                    ],
-                    temperature: 0.6
+                    ]
                 })
             });
 
-            if (!response.ok) {
-                const err = await response.json();
-                aiMsg.innerText = "Fehler: " + (err.error?.message || "API-Limit erreicht.");
-            } else {
-                const data = await response.json();
+            const data = await response.json();
+            if (data.choices && data.choices[0]) {
                 aiMsg.innerText = data.choices[0].message.content;
+            } else {
+                aiMsg.innerText = "Fehler: " + (data.error?.message || "Unbekanntes Problem.");
             }
         } catch (err) {
-            aiMsg.innerText = "Netzwerkfehler. Bitte Internetverbindung prüfen.";
-            console.error("Groq-Error:", err);
+            aiMsg.innerText = "Verbindung zu Groq unterbrochen.";
         }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // Chips (Vorschläge) Event-Delegation (Damit Klicks immer funktionieren)
+    // Chip-Klicks abfangen
     document.addEventListener('click', function (e) {
         if (e.target && e.target.classList.contains('chat-chip')) {
             askAI(e.target.innerText);
         }
     });
 
-    // Senden-Events
     document.getElementById('send-chat').onclick = () => askAI(input.value);
     input.onkeypress = (e) => { if (e.key === 'Enter') askAI(input.value); };
 }
 
-// 5. APP INITIALISIERUNG
+// 5. START
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    
-    // Modal Close Button
-    const closeBtn = document.getElementById('closeModal');
-    if (closeBtn) closeBtn.onclick = closeModal;
+    if (document.getElementById('closeModal')) {
+        document.getElementById('closeModal').onclick = closeModal;
+    }
 });
