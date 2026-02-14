@@ -12,37 +12,23 @@ async function fetchPosts() {
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
             const card = document.createElement('div');
-            card.className = 'hover-card bg-white rounded-[2rem] overflow-hidden shadow-md flex flex-col h-full border border-slate-100';
-            
+            card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col';
             card.innerHTML = `
-                <div class="h-48 overflow-hidden bg-slate-200">
-                    <img src="${media}" class="w-full h-full object-cover">
-                </div>
-                <div class="p-6 flex flex-col flex-grow">
-                    <h5 class="text-xl font-bold text-[#003366] mb-6 leading-tight flex-grow">
-                        ${post.title.rendered}
-                    </h5>
-                    <div class="flex gap-3">
-                        <button class="js-details flex-1 px-4 py-3 rounded-full border-2 border-[#003366] text-[#003366] font-bold hover:bg-[#003366] hover:text-white transition-all cursor-pointer">
-                            Details
-                        </button>
-                        ${hasH5P ? `
-                        <button class="js-start flex-1 px-4 py-3 rounded-full bg-[#22c55e] text-white font-bold hover:bg-[#16a34a] shadow-lg shadow-green-200 transition-all cursor-pointer">
-                            🚀 Start
-                        </button>` : ''}
+                <img src="${media}" class="h-44 w-full object-cover">
+                <div class="p-5 flex flex-col flex-grow">
+                    <h5 class="text-lg font-bold text-[#003366] mb-4">${post.title.rendered}</h5>
+                    <div class="flex gap-2 mt-auto">
+                        <button class="js-details flex-1 py-2 rounded-full border-2 border-[#003366] text-[#003366] font-bold cursor-pointer hover:bg-[#003366] hover:text-white">Details</button>
+                        ${hasH5P ? `<button class="js-start flex-1 py-2 rounded-full bg-[#22c55e] text-white font-bold cursor-pointer hover:bg-[#16a34a]">🚀 Start</button>` : ''}
                     </div>
                 </div>`;
             
-            card.querySelector('.js-details').addEventListener('click', () => openContent(post.id, false));
-            if (hasH5P) {
-                card.querySelector('.js-start').addEventListener('click', () => openContent(post.id, true));
-            }
+            card.querySelector('.js-details').onclick = () => openContent(post.id, false);
+            if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
 
             container.appendChild(card);
         });
-    } catch (e) {
-        container.innerHTML = "<p class='text-center col-span-full'>Fehler beim Laden.</p>";
-    }
+    } catch (e) { container.innerHTML = "Fehler beim Laden."; }
 }
 
 async function openContent(postId, directH5P) {
@@ -50,9 +36,10 @@ async function openContent(postId, directH5P) {
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    body.innerHTML = '<div class="flex justify-center py-20"><div class="animate-spin h-10 w-10 border-4 border-[#00aaff] border-r-transparent rounded-full"></div></div>';
+    // 1. Erst Modal zeigen, dann laden
+    modal.classList.remove('hidden');
+    body.innerHTML = '<p class="text-center py-10">Lade Inhalt...</p>';
     footer.innerHTML = "";
-    modal.classList.remove('modal-hidden');
 
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
@@ -66,35 +53,28 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `
-                <div class="aspect-video w-full rounded-2xl overflow-hidden shadow-inner">
-                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                    class="w-full h-full border-0" allowfullscreen></iframe>
-                </div>`;
+            body.innerHTML = `<div class="aspect-video"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full rounded-xl" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-3xl font-extrabold text-[#003366] mb-6">${post.title.rendered}</h2>
-                              <div class="prose prose-slate max-w-none text-lg">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold text-[#003366] mb-4">${post.title.rendered}</h2><div class="text-slate-600">${post.content.rendered}</div>`;
             if (h5pId) {
-                const sBtn = document.createElement('button');
-                sBtn.className = "px-12 py-4 rounded-full bg-[#22c55e] text-white font-bold text-xl hover:bg-[#16a34a] transition-all cursor-pointer shadow-xl";
-                sBtn.innerText = "🚀 Übung jetzt starten";
-                sBtn.onclick = () => openContent(post.id, true);
-                footer.appendChild(sBtn);
+                const b = document.createElement('button');
+                b.className = "px-8 py-3 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer";
+                b.innerText = "🚀 Jetzt Übung starten";
+                b.onclick = () => openContent(post.id, true);
+                footer.appendChild(b);
             }
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// Modal schließen
-document.getElementById('closeModal').onclick = () => {
-    document.getElementById('contentModal').classList.add('modal-hidden');
-};
+// Schließen-Logik
+document.getElementById('closeModal').onclick = () => document.getElementById('contentModal').classList.add('hidden');
 
 // Suche
 document.getElementById('searchInput').oninput = (e) => {
-    const term = e.target.value.toLowerCase();
+    const val = e.target.value.toLowerCase();
     document.querySelectorAll('#posts-container > div').forEach(el => {
-        el.style.display = el.innerText.toLowerCase().includes(term) ? 'flex' : 'none';
+        el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
     });
 };
 
