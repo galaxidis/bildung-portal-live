@@ -8,7 +8,7 @@ let GEMINI_API_KEY = "";
 async function loadApiKey() {
     try {
         const response = await fetch(KEY_URL);
-        if (!response.ok) throw new Error("Key-Datei nicht gefunden");
+        if (!response.ok) throw new Error("Key nicht gefunden");
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
         console.log("✅ Key geladen.");
@@ -18,7 +18,7 @@ async function loadApiKey() {
 }
 
 /**
- * 2. BEITRÄGE LADEN (MIT H5P & START-BUTTON FIX)
+ * 2. BEITRÄGE LADEN (MIT FIX FÜR START- UND DETAILS-BUTTON)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -29,8 +29,7 @@ async function fetchPosts() {
         container.innerHTML = ""; 
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
-            const contentString = post.content.rendered.toLowerCase();
-            const hasH5P = contentString.includes('h5p');
+            const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
 
             const col = document.createElement('div');
             col.className = 'w-full'; 
@@ -48,41 +47,35 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
-            // Event-Listener für beide Buttons
-            col.querySelector('.js-details').onclick = () => openContent(post.id);
+            // WICHTIG: Direkte Zuweisung der Klick-Events
+            col.querySelector('.js-details').addEventListener('click', () => openContent(post.id));
             if (hasH5P) {
-                col.querySelector('.js-start').onclick = () => openContent(post.id);
+                col.querySelector('.js-start').addEventListener('click', () => openContent(post.id));
             }
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler beim Post-Laden", e); }
+    } catch (e) { console.error("Fehler beim Laden:", e); }
 }
 
 /**
- * 3. MODAL ÖFFNEN / SCHLIESSEN
+ * 3. MODAL ÖFFNEN
  */
 async function openContent(postId) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
-    if (!modal || !body) return;
-
-    modal.classList.remove('hidden');
-    body.innerHTML = 'Laden...';
-    try {
-        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
-        const post = await res.json();
-        body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
-    } catch (e) { body.innerHTML = "Inhalt konnte nicht geladen werden."; }
-}
-
-// Schließen-Funktion separat
-function closeContentModal() {
-    const modal = document.getElementById('contentModal');
-    if (modal) modal.classList.add('hidden');
+    if (modal && body) {
+        modal.classList.remove('hidden');
+        body.innerHTML = 'Laden...';
+        try {
+            const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
+            const post = await res.json();
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+        } catch (e) { body.innerHTML = "Fehler beim Laden des Inhalts."; }
+    }
 }
 
 /**
- * 4. CHAT-BOT (FENSTER & LOGIK)
+ * 4. CHAT-BOT (STEUERUNG UND API)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -92,27 +85,52 @@ function initChat() {
     const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
-    // Fenster öffnen/schließen Fix
+    // Chat öffnen
     if (chatToggle && chatWindow) {
-        chatToggle.addEventListener('click', () => {
-            chatWindow.classList.toggle('hidden');
-            console.log("Chat-Fenster Toggle");
-        });
+        chatToggle.onclick = () => chatWindow.classList.toggle('hidden');
     }
 
+    // Chat schließen
     if (chatClose && chatWindow) {
-        chatClose.addEventListener('click', () => {
-            chatWindow.classList.add('hidden');
-        });
+        chatClose.onclick = () => chatWindow.classList.add('hidden');
     }
 
-    // Chips/Vorschläge
+    // Chips (Vorschläge)
     document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.addEventListener('click', () => { 
-            chatInput.value = chip.innerText;
-            askGemini(chip.innerText); 
-        });
+        chip.onclick = () => {
+            if (chatInput) {
+                chatInput.value = chip.innerText;
+                askGemini(chip.innerText);
+            }
+        };
     });
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) return;
+        
+        const addMsg = (text, isBot = true) => {
+            const m = document.createElement('div');
+            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs";
+            m.innerText = text;
+            msgArea.appendChild(m);
+            msgArea.scrollTop = msgArea.scrollHeight;
+            return m;
+        };
+
+        addMsg(question, false);
+        if (chatInput) chatInput.value = "";
+        const loadingMsg = addMsg("KI überlegt...");
+
+        try {
+            // Wir nutzen v1beta, da Pro-Keys dort oft flexibler sind
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error?.message || "Fehler");
+            loadingMsg
