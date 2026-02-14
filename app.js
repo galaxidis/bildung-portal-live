@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-// 1. MODAL & H5P (UNBERÜHRT & STABIL)
+// 1. MODAL & H5P (FIXIERT)
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -39,7 +39,7 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Kachel-Fehler"); }
+    } catch (e) { console.error("WP-Fehler"); }
 }
 
 async function openContent(postId, directH5P) {
@@ -64,7 +64,7 @@ async function openContent(postId, directH5P) {
     } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (RADIKALE FEHLER-DIAGNOSE)
+// 4. CHAT-BOT (MIT CHIP-KORREKTUR)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -77,45 +77,38 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "KI schreibt...";
+        m.innerText = "Frage wird gesendet...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
-            // Wir erzwingen v1 und nutzen das absolut sicherste Format
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // HINWEIS: Falls Google blockiert, hier eine Proxy-URL oder einen anderen Anbieter nutzen
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz: " + q }] }]
-                })
+                body: JSON.stringify({ contents: [{ parts: [{ text: q }] }] })
             });
-
             const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content) {
-                m.innerText = data.candidates[0].content.parts[0].text;
-            } else {
-                // HIER ZEIGEN WIR JETZT DEN ECHTEN GOOGLE-FEHLER IM CHAT
-                const errorInfo = data.error ? data.error.message : "Unbekanntes Format";
-                m.innerText = "Google sagt: " + errorInfo;
-                console.log("Full Error Data:", data);
-            }
-        } catch (err) { 
-            m.innerText = "Netzwerkfehler. Bitte Internet prüfen."; 
-        }
+            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Google blockiert den Zugriff (Region/CORS).";
+        } catch (err) { m.innerText = "Netzwerkfehler."; }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // CHIPS - FESTE VERDRAHTUNG
-    document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.style.cursor = "pointer";
-        chip.addEventListener('click', function(e) {
-            e.preventDefault();
-            ask(this.innerText);
+    // CHIPS ANKLICKBAR MACHEN
+    function bindChips() {
+        const chips = document.querySelectorAll('.chat-chip');
+        chips.forEach(chip => {
+            chip.style.cursor = "pointer";
+            chip.onclick = (e) => {
+                e.preventDefault();
+                ask(chip.innerText);
+            };
         });
-    });
+    }
+
+    // Da Chips oft dynamisch sind, binden wir sie beim Start
+    bindChips();
 
     document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
