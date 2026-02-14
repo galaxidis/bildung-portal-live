@@ -1,7 +1,8 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
 /**
- * 1. HAUPTFUNKTION: LÄDT DIE BEITRÄGE
+ * 1. BEITRÄGE LADEN
+ * Holt die Daten von WordPress und erstellt die Kacheln.
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -10,14 +11,20 @@ async function fetchPosts() {
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
-        container.innerHTML = ""; 
+        
+        container.innerHTML = ""; // Spinner entfernen
 
         posts.forEach(post => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
+            // Grid-Spalte erstellen
+            const col = document.createElement('div');
+            col.className = 'w-full'; // Tailwind Grid übernimmt das Layout
+
             const card = document.createElement('div');
             card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
+            
             card.innerHTML = `
                 <div class="h-44 overflow-hidden bg-slate-200">
                     <img src="${media}" class="w-full h-full object-cover">
@@ -30,23 +37,26 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
+            // Events binden
             card.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
-            container.appendChild(card);
+            
+            col.appendChild(card);
+            container.appendChild(col);
         });
     } catch (e) {
-        container.innerHTML = "<p class='text-center py-10 col-span-full'>Fehler beim Laden.</p>";
+        console.error("Ladefehler:", e);
+        container.innerHTML = "<p class='text-center py-10 col-span-full'>Inhalte konnten nicht geladen werden.</p>";
     }
 }
 
 /**
- * 2. RADIKALE SUCH-LOGIK: EINFACH & STABIL
+ * 2. SUCHE
+ * Filtert die Kacheln und zeigt eine Meldung, wenn nichts gefunden wurde.
  */
 function performSearch() {
     const sInput = document.getElementById('searchInput');
-    if (!sInput) return;
-    
-    const term = sInput.value.toLowerCase().trim();
+    const term = sInput ? sInput.value.toLowerCase().trim() : "";
     const container = document.getElementById('posts-container');
     const cards = container.querySelectorAll('.hover-card');
     
@@ -54,15 +64,15 @@ function performSearch() {
 
     cards.forEach(card => {
         const title = card.querySelector('h5').innerText.toLowerCase();
+        // Wir blenden das Elternelement (die Grid-Spalte) ein/aus
         if (title.includes(term)) {
-            card.parentElement.style.display = 'block'; // Zeigt das Grid-Element (col)
+            card.parentElement.style.display = 'block';
             visibleCount++;
         } else {
             card.parentElement.style.display = 'none';
         }
     });
 
-    // Negativ-Meldung Logik
     const existingMsg = document.getElementById('no-results-msg');
     if (existingMsg) existingMsg.remove();
 
@@ -70,22 +80,27 @@ function performSearch() {
         const msg = document.createElement('div');
         msg.id = 'no-results-msg';
         msg.className = 'col-span-full text-center py-12 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200';
-        msg.innerHTML = `<h3 class="text-xl font-bold text-[#003366]">Nichts gefunden für "${term}"</h3>
-                         <button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline">Alle Inhalte anzeigen</button>`;
+        msg.innerHTML = `
+            <h3 class="text-xl font-bold text-[#003366]">Nichts gefunden für "${term}"</h3>
+            <button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle Inhalte anzeigen</button>
+        `;
         container.appendChild(msg);
     }
 }
 
 /**
- * 3. MODAL-LOGIK: H5P OHNE SCHWARZE RÄNDER
+ * 3. MODAL (INHALT ÖFFNEN)
+ * Mit dem "Reiniger-Fix" für H5P (schneidet Kopf- und Fußzeilen weg).
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
+    if (!modal) return;
+
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-10">Lade...</div>';
+    body.innerHTML = '<div class="text-center py-10"><div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00aaff] border-r-transparent"></div></div>';
     footer.innerHTML = "";
 
     try {
@@ -100,31 +115,39 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // DER FIX: Wir setzen die Höhe des Iframes so, dass der untere H5P-Müll abgeschnitten wird
+            // H5P-MODUS mit "Clipping": Schneidet oben 45px und unten den Rest ab
             body.innerHTML = `
-                <div style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; overflow: hidden; border-radius: 1.5rem; background: white;">
+                <div style="position: relative; width: 100%; padding-bottom: 56.25%; overflow: hidden; border-radius: 1.5rem; background: #fff; box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);">
                     <iframe 
                         src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" 
+                        style="position: absolute; top: -45px; left: 0; width: 100%; height: calc(100% + 90px); border: 0;" 
                         allowfullscreen 
                         scrolling="no">
                     </iframe>
                 </div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold text-[#003366] mb-4">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+            // NORMALER TEXT-MODUS
+            body.innerHTML = `
+                <h2 class="text-3xl font-extrabold text-[#003366] mb-6 leading-tight">${post.title.rendered}</h2>
+                <div class="prose prose-slate max-w-none text-lg text-slate-600">
+                    ${post.content.rendered}
+                </div>`;
+            
             if (h5pId) {
                 const btn = document.createElement('button');
-                btn.className = "px-10 py-3 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer";
-                btn.innerText = "🚀 Übung starten";
+                btn.className = "px-10 py-4 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer hover:bg-[#16a34a] shadow-lg transition-all text-xl";
+                btn.innerText = "🚀 Übung jetzt starten";
                 btn.onclick = () => openContent(post.id, true);
                 footer.appendChild(btn);
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) {
+        body.innerHTML = "<p class='text-center text-red-500'>Inhalt konnte nicht geladen werden.</p>";
+    }
 }
 
 /**
- * 4. INITIALISIERUNG
+ * 4. START-EVENTS
  */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
@@ -135,8 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sInput) sInput.oninput = performSearch;
     if (sBtn) sBtn.onclick = performSearch;
     
-    document.getElementById('closeModal').onclick = () => {
-        document.getElementById('contentModal').classList.add('hidden');
-        document.getElementById('modalTextContent').innerHTML = "";
-    };
+    // Modal Schließen
+    const closeBtn = document.getElementById('closeModal');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            document.getElementById('contentModal').classList.add('hidden');
+            document.getElementById('modalTextContent').innerHTML = "";
+        };
+    }
 });
