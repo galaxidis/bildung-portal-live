@@ -1,10 +1,10 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-// HIER DEINEN KEY EINTRAGEN
+// HIER DEINEN KEY EINTRAGEN (Zwischen die Anführungszeichen)
 const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
 
 /**
- * 1. BEITRÄGE LADEN (KACHELN-FIX)
+ * 1. BEITRÄGE LADEN (DIE KACHELN)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -20,7 +20,6 @@ async function fetchPosts() {
             
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
 
-            // Die exakte Kachel-Struktur zurückbringen
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
@@ -38,18 +37,20 @@ async function fetchPosts() {
                 </div>`;
             
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            if (hasH5P) {
+                col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            }
             
             container.appendChild(col);
         });
-        console.log("✅ Kacheln sind wieder da.");
+        console.log("✅ Kacheln erfolgreich geladen.");
     } catch (e) { 
-        console.error("Fehler beim Kachel-Laden:", e);
+        console.error("Fehler beim Laden der Posts:", e);
     }
 }
 
 /**
- * 2. MODAL ÖFFNEN
+ * 2. MODAL ÖFFNEN (TEXT ODER H5P)
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
@@ -72,13 +73,18 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
+            body.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
+                <div class="prose max-w-none text-slate-700">${post.content.rendered}</div>
+            `;
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { 
+        body.innerHTML = "Fehler beim Laden des Inhalts."; 
+    }
 }
 
 /**
- * 3. CHAT-BOT LOGIK
+ * 3. CHAT-BOT LOGIK (FIX FÜR V1BETA)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -98,8 +104,8 @@ function initChat() {
     });
 
     async function askGemini(question) {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("HIER_EINSETZEN")) {
-            alert("Bitte trage den Key oben im Code ein!");
+        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("DEIN_AIZA")) {
+            alert("Bitte API-Key in der app.js eintragen!");
             return;
         }
         
@@ -117,45 +123,51 @@ function initChat() {
         const loadingMsg = addMsg("Ich überlege...");
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // HIER IST DER FIX: v1beta statt v1
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte kurz und freundlich auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
-            if (data.candidates) {
+            
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
                 loadingMsg.innerText = data.candidates[0].content.parts[0].text;
             } else {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Google blockiert.");
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Keine Antwort von der KI.");
+                console.error("Google-Response:", data);
             }
         } catch (err) {
             loadingMsg.innerText = "Verbindung fehlgeschlagen.";
+            console.error(err);
         }
     }
 
-    sendBtn?.onclick = () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); };
-    chatInput?.onkeypress = (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); };
+    sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
 }
 
 /**
- * 4. START
+ * 4. INITIALISIERUNG
  */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
     
-    document.getElementById('closeModal')?.addEventListener('click', () => {
-        document.getElementById('contentModal').classList.add('hidden');
-    });
-
+    // Suche
     document.getElementById('searchInput')?.addEventListener('input', () => {
         const term = document.getElementById('searchInput').value.toLowerCase().trim();
         document.querySelectorAll('.hover-card').forEach(card => {
             const title = card.querySelector('h5').innerText.toLowerCase();
             card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
         });
+    });
+
+    // Modal Schließen
+    document.getElementById('closeModal')?.addEventListener('click', () => {
+        document.getElementById('contentModal').classList.add('hidden');
     });
 });
