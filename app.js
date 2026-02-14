@@ -1,19 +1,19 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
+const KEY_URL = 'https://hub.bildungdigital.at/key.txt'; // Der Pfad zu deinem Server
 let GEMINI_API_KEY = "";
 
 /**
- * 0. KEY VOM SERVER LADEN
+ * 0. KEY VOM HUB-SERVER LADEN (CORS-Lösung)
  */
 async function loadApiKey() {
     try {
-        // Lädt die Datei aus dem Stammverzeichnis
-        const response = await fetch('key.txt'); 
-        if (!response.ok) throw new Error("Key-Datei nicht gefunden");
+        const response = await fetch(KEY_URL);
+        if (!response.ok) throw new Error("Key-Datei auf dem Server nicht erreichbar");
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
-        console.log("KI-Schnittstelle bereit.");
+        console.log("KI-Schnittstelle erfolgreich vom Hub-Server initialisiert.");
     } catch (e) {
-        console.warn("KI-Key konnte nicht geladen werden. Chatbot eingeschränkt.");
+        console.error("KI-Fehler: Der Browser blockiert den Key-Zugriff (CORS) oder die Datei fehlt.", e);
     }
 }
 
@@ -27,6 +27,7 @@ async function fetchPosts() {
         const res = await fetch(API_URL);
         const posts = await res.json();
         container.innerHTML = ""; 
+        
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url 
                           || `https://picsum.photos/seed/${post.id}/600/400`;
@@ -37,7 +38,7 @@ async function fetchPosts() {
             card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
             card.innerHTML = `
                 <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
-                    <img src="${media}" class="w-full h-full object-cover">
+                    <img src="${media}" class="w-full h-full object-cover" loading="lazy">
                 </div>
                 <div class="p-5 flex flex-col flex-grow">
                     <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
@@ -46,12 +47,16 @@ async function fetchPosts() {
                         ${hasH5P ? `<button class="js-start flex-1 py-2 rounded-full bg-[#22c55e] text-white font-bold hover:bg-[#16a34a] shadow-sm transition-all text-sm">🚀 Start</button>` : ''}
                     </div>
                 </div>`;
+            
             card.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            
             col.appendChild(card);
             container.appendChild(col);
         });
-    } catch (e) { container.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { 
+        container.innerHTML = "<p class='col-span-full text-center py-10'>Inhalte konnten nicht geladen werden.</p>"; 
+    }
 }
 
 /**
@@ -69,8 +74,11 @@ function performSearch() {
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
+    if (!modal) return;
+    
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-20 italic">Inhalt wird geladen...</div>';
+    body.innerHTML = '<div class="text-center py-20 italic">Wird geladen...</div>';
+    
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -79,12 +87,13 @@ async function openContent(postId, directH5P) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
+        
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[65vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
             body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Inhalt konnte nicht geladen werden."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden des Inhalts."; }
 }
 
 /**
@@ -101,12 +110,15 @@ function initChat() {
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
     document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.addEventListener('click', () => { chatInput.value = chip.innerText; chatInput.focus(); });
+        chip.addEventListener('click', () => { 
+            chatInput.value = chip.innerText; 
+            chatInput.focus(); 
+        });
     });
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) {
-            alert("KI-Key nicht geladen. Bitte prüfe die key.txt im Stammverzeichnis.");
+            alert("Der KI-Schlüssel konnte nicht geladen werden. Bitte CORS-Einstellungen am Server prüfen.");
             return;
         }
 
@@ -121,7 +133,7 @@ function initChat() {
 
         addMessage(question, false);
         chatInput.value = "";
-        const loadingMsg = addMessage("Ich überlege...");
+        const loadingMsg = addMessage("Überlege...");
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -138,7 +150,7 @@ function initChat() {
                 throw new Error();
             }
         } catch (err) {
-            loadingMsg.innerText = "Entschuldige, ich konnte keine Verbindung aufbauen. Ist der Key korrekt?";
+            loadingMsg.innerText = "Verbindung fehlgeschlagen. Der API-Key ist eventuell ungültig oder gesperrt.";
         }
     }
 
@@ -150,11 +162,16 @@ function initChat() {
  * 4. START-SEQUENZ
  */
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadApiKey(); // 1. Key laden
-    fetchPosts();       // 2. Kacheln laden
-    initChat();         // 3. Chat bereitmachen
+    // 1. Zuerst den Key vom Hub-Server holen
+    await loadApiKey();
+    
+    // 2. Dann die restlichen Funktionen starten
+    fetchPosts();
+    initChat();
     
     document.getElementById('searchInput')?.addEventListener('input', performSearch);
+    document.getElementById('searchButton')?.addEventListener('click', performSearch);
+    
     document.getElementById('closeModal')?.addEventListener('click', () => {
         document.getElementById('contentModal').classList.add('hidden');
     });
