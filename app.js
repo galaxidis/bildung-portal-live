@@ -1,7 +1,8 @@
+// Konfiguration
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const AI_API_KEY = "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"; 
 
-// 1. MODAL & H5P (Bleibt stabil)
+// 1. MODAL & H5P (Absolut sicher isoliert)
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -39,7 +40,7 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Kacheln konnten nicht geladen werden."); }
+    } catch (e) { console.error("WP-Ladefehler"); }
 }
 
 async function openContent(postId, directH5P) {
@@ -47,7 +48,7 @@ async function openContent(postId, directH5P) {
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = 'Lade...';
+    body.innerHTML = 'Lade Inhalt...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -61,10 +62,10 @@ async function openContent(postId, directH5P) {
         } else {
             body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
-// 4. CHAT-BOT (MIT DETAILLIERTER FEHLERANALYSE)
+// 4. CHAT-BOT (FIX FÜR CORS & CHIPS)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -74,10 +75,10 @@ function initChat() {
     document.getElementById('close-chat').onclick = () => win.classList.add('hidden');
 
     async function ask(q) {
-        if (!q.trim()) return;
+        if (!q || !q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "Verbindung wird geprüft...";
+        m.innerText = "Verbindung wird aufgebaut...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
@@ -86,41 +87,42 @@ function initChat() {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${AI_API_KEY}`,
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + AI_API_KEY.trim()
                 },
                 body: JSON.stringify({
                     model: "llama3-8b-8192",
-                    messages: [{ role: "user", content: "Antworte kurz: " + q }]
+                    messages: [{ role: "user", content: "Antworte sehr kurz: " + q }],
+                    temperature: 0.7
                 })
             });
 
             if (!response.ok) {
-                const errorBody = await response.json();
-                m.innerText = "Groq Fehler: " + (errorBody.error?.message || response.statusText);
+                const errorData = await response.json();
+                m.innerText = "API Fehler: " + (errorData.error?.message || response.status);
             } else {
                 const data = await response.json();
                 m.innerText = data.choices[0].message.content;
             }
         } catch (err) { 
-            m.innerText = "Netzwerk-Block: Dein Browser oder Router lässt die Anfrage nicht zu. (CORS/Inkognito)";
-            console.error(err);
+            m.innerText = "Netzwerk-Blockade! Browser verhindert API-Aufruf (CORS).";
+            console.error("Fetch-Error:", err);
         }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // Chips (Vorschläge)
-    document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.onclick = (e) => {
-            e.preventDefault();
-            ask(chip.innerText);
-        };
+    // CHIPS - FESTE VERDRAHTUNG (Wir nutzen Event Delegation)
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('chat-chip')) {
+            ask(e.target.innerText);
+        }
     });
 
     document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
 
+// 5. DOM READY START
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
