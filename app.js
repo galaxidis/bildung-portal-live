@@ -3,23 +3,22 @@ let GEMINI_API_KEY = "";
 
 /**
  * 0. KEY VOM SERVER LADEN
- * Wir laden den Key aus der key.txt im Stammverzeichnis.
+ * Wir nutzen die absolute URL, um den 404-Fehler sicher zu umgehen.
  */
 async function loadApiKey() {
     try {
-        const response = await fetch('key.txt?v=' + new Date().getTime()); // Cache-Busting
-        if (!response.ok) throw new Error("Key-Datei nicht gefunden");
+        const response = await fetch('https://hub.bildungdigital.at/key.txt?v=' + new Date().getTime()); 
+        if (!response.ok) throw new Error("Key-Datei konnte nicht geladen werden.");
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
-        console.log("✅ KI-Schnittstelle bereit.");
+        console.log("✅ KI-Schnittstelle bereit. Key erfolgreich geladen.");
     } catch (e) {
-        console.warn("❌ KI-Key Fehler:", e.message);
+        console.error("❌ KI-Key Fehler:", e.message);
     }
 }
 
 /**
- * 1. BEITRÄGE LADEN
- * Erstellt die Kacheln und prüft auf H5P-Inhalte.
+ * 1. BEITRÄGE LADEN & KACHELN ERSTELLEN
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -40,8 +39,8 @@ async function fetchPosts() {
             col.className = 'w-full'; 
             col.innerHTML = `
                 <div class="hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full">
-                    <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
-                        <img src="${media}" class="w-full h-full object-cover">
+                    <div class="h-44 overflow-hidden bg-slate-50 flex items-center justify-center">
+                        <img src="${media}" class="w-full h-full object-cover" loading="lazy">
                     </div>
                     <div class="p-5 flex flex-col flex-grow">
                         <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
@@ -52,22 +51,21 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
-            // Event-Listener für Buttons
+            // Klick-Events
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) {
                 col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             }
             container.appendChild(col);
         });
-        console.log("✅ Kacheln erfolgreich generiert.");
+        console.log("✅ Kacheln geladen.");
     } catch (e) { 
-        container.innerHTML = "<p class='p-5'>Fehler beim Laden der Beiträge.</p>";
-        console.error(e);
+        console.error("Fehler beim Laden der Posts:", e);
     }
 }
 
 /**
- * 2. MODAL ÖFFNEN (TEXT ODER H5P)
+ * 2. MODAL ÖFFNEN (TEXT ODER H5P IFRAME)
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
@@ -75,7 +73,7 @@ async function openContent(postId, directH5P) {
     if (!modal || !body) return;
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-20 italic">Inhalt wird geladen...</div>';
+    body.innerHTML = '<div class="text-center py-20 italic">Wird geladen...</div>';
     
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
@@ -96,16 +94,16 @@ async function openContent(postId, directH5P) {
         } else {
             body.innerHTML = `
                 <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
-                <div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>
+                <div class="prose max-w-none text-slate-700">${post.content.rendered}</div>
             `;
         }
     } catch (e) { 
-        body.innerHTML = "Fehler beim Laden des Beitrags."; 
+        body.innerHTML = "Fehler beim Laden."; 
     }
 }
 
 /**
- * 3. CHAT-BOT LOGIK
+ * 3. CHAT-BOT LOGIK (GEMINI 1.5 FLASH)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -117,7 +115,7 @@ function initChat() {
     chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
-    // Chips / Vorschläge
+    // Chips / Vorschläge sofort senden
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.addEventListener('click', () => { 
             const text = chip.innerText;
@@ -128,7 +126,7 @@ function initChat() {
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) {
-            alert("API-Key nicht geladen!");
+            alert("Fehler: API-Key wurde nicht geladen.");
             return;
         }
         
@@ -146,55 +144,21 @@ function initChat() {
         const loadingMsg = addMessage("Ich überlege...");
 
         try {
-            // Wir nutzen die stabile v1 Schnittstelle für Gemini 1.5 Flash
+            // Stabiler Endpunkt für Gemini 1.5 Flash
             const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte als Assistent für digitale Bildung kurz und präzise auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte als freundlicher Bildungs-Assistent kurz auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
             
             if (!response.ok) {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Anfrage abgelehnt.");
-                console.error("Google Error:", data);
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Google lehnt die Anfrage ab.");
                 return;
             }
 
             if (data.candidates && data.candidates[0].content.parts[0].text) {
-                loadingMsg.innerText = data.candidates[0].content.parts[0].text;
-            }
-        } catch (err) {
-            loadingMsg.innerText = "Verbindung zum KI-Server unterbrochen.";
-            console.error(err);
-        }
-    }
-
-    sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
-    chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
-}
-
-/**
- * 4. INITIALISIERUNG
- */
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadApiKey();
-    fetchPosts();
-    initChat();
-    
-    // Suche
-    document.getElementById('searchInput')?.addEventListener('input', () => {
-        const term = document.getElementById('searchInput').value.toLowerCase().trim();
-        document.querySelectorAll('.hover-card').forEach(card => {
-            const title = card.querySelector('h5').innerText.toLowerCase();
-            card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
-        });
-    });
-
-    // Modal schließen
-    document.getElementById('closeModal')?.addEventListener('click', () => {
-        document.getElementById('contentModal').classList.add('hidden');
-    });
-});
+                loadingMsg.innerText = data.candidates[0].content.parts
