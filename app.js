@@ -18,7 +18,7 @@ async function loadApiKey() {
 }
 
 /**
- * 2. BEITRÄGE LADEN (MIT H5P REPARATUR)
+ * 2. BEITRÄGE LADEN (MIT H5P & START-BUTTON FIX)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -29,8 +29,6 @@ async function fetchPosts() {
         container.innerHTML = ""; 
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
-            
-            // H5P Erkennung wieder eingebaut
             const contentString = post.content.rendered.toLowerCase();
             const hasH5P = contentString.includes('h5p');
 
@@ -50,6 +48,7 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
+            // Event-Listener für beide Buttons
             col.querySelector('.js-details').onclick = () => openContent(post.id);
             if (hasH5P) {
                 col.querySelector('.js-start').onclick = () => openContent(post.id);
@@ -59,9 +58,14 @@ async function fetchPosts() {
     } catch (e) { console.error("Fehler beim Post-Laden", e); }
 }
 
+/**
+ * 3. MODAL ÖFFNEN / SCHLIESSEN
+ */
 async function openContent(postId) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
+    if (!modal || !body) return;
+
     modal.classList.remove('hidden');
     body.innerHTML = 'Laden...';
     try {
@@ -71,13 +75,38 @@ async function openContent(postId) {
     } catch (e) { body.innerHTML = "Inhalt konnte nicht geladen werden."; }
 }
 
+// Schließen-Funktion separat
+function closeContentModal() {
+    const modal = document.getElementById('contentModal');
+    if (modal) modal.classList.add('hidden');
+}
+
 /**
- * 3. CHAT-BOT (PRO-STABILITÄT)
+ * 4. CHAT-BOT (FENSTER & LOGIK)
  */
 function initChat() {
+    const chatToggle = document.getElementById('chat-toggle');
+    const chatWindow = document.getElementById('chat-window');
+    const chatClose = document.getElementById('close-chat');
     const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
+    // Fenster öffnen/schließen Fix
+    if (chatToggle && chatWindow) {
+        chatToggle.addEventListener('click', () => {
+            chatWindow.classList.toggle('hidden');
+            console.log("Chat-Fenster Toggle");
+        });
+    }
+
+    if (chatClose && chatWindow) {
+        chatClose.addEventListener('click', () => {
+            chatWindow.classList.add('hidden');
+        });
+    }
+
+    // Chips/Vorschläge
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.addEventListener('click', () => { 
             chatInput.value = chip.innerText;
@@ -87,45 +116,3 @@ function initChat() {
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) return;
-        
-        const addMsg = (text, isBot = true) => {
-            const m = document.createElement('div');
-            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs";
-            m.innerText = text;
-            msgArea.appendChild(m);
-            msgArea.scrollTop = msgArea.scrollHeight;
-            return m;
-        };
-
-        addMsg(question, false);
-        chatInput.value = "";
-        const loadingMsg = addMsg("KI (Pro) wird kontaktiert...");
-
-        try {
-            // Wir nutzen hier gemini-1.5-flash. Es ist das Standard-Modell für API-Aufrufe.
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
-                })
-            });
-
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error?.message || "Fehler");
-            loadingMsg.innerText = data.candidates[0].content.parts[0].text;
-
-        } catch (err) {
-            loadingMsg.innerHTML = `<span class="text-red-500">Fehler: ${err.message}</span>`;
-        }
-    }
-
-    document.getElementById('send-chat')?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadApiKey();
-    fetchPosts();
-    initChat();
-    document.getElementById('closeModal')?.addEventListener('click', () => document.getElementById('contentModal').classList.add('hidden'));
-});
