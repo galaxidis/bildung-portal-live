@@ -10,7 +10,7 @@ function closeModal() {
     }
 }
 
-// 2. BEITRÄGE LADEN (DIE KACHELN)
+// 2. KACHELN LADEN
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -39,27 +39,23 @@ async function fetchPosts() {
                 </div>`;
             
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) {
-                col.querySelector('.js-start').onclick = () => openContent(post.id, true);
-            }
+            if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
     } catch (e) { console.error("Kachel-Fehler:", e); }
 }
 
-// 3. INHALT ÖFFNEN (DER FIX FÜR H5P UND POPUP)
+// 3. INHALT ÖFFNEN
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="p-10 text-center italic">Inhalt wird geladen...</div>';
+    body.innerHTML = '<div class="p-10 text-center">Lade Inhalt...</div>';
     
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        
-        // H5P ID EXTRAKTION AUS DEN TAGS
         let h5pId = null;
         if (post._embedded?.['wp:term']?.[1]) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
@@ -67,22 +63,14 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // DER FIX: Saubere H5P Einbindung
-            body.innerHTML = `
-                <div class="w-full h-[70vh]">
-                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                            class="w-full h-full border-0" 
-                            allowfullscreen></iframe>
-                </div>`;
+            body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `
-                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
-                <div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (FIX: GEMINI-PRO NUTZEN)
+// 4. CHAT-BOT (FIX: VERSION V1 + CHIPS ANKLICKBAR)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -96,28 +84,29 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "Denke nach...";
+        m.innerText = "KI denkt nach...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
-            // WECHSEL AUF gemini-pro (STABILER FÜR V1BETA UND DEINEN KEY)
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+            // FIX: Wir nutzen /v1/ und gemini-1.5-flash (Standard für AI Studio Keys)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + q }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Kurze Antwort auf Deutsch: " + q }] }] })
             });
 
             const data = await response.json();
-            if (data.candidates && data.candidates[0].content) {
-                m.innerText = data.candidates[0].content.parts[0].text;
-            } else {
-                m.innerText = "Fehler: " + (data.error?.message || "Modell nicht erreichbar.");
-            }
-        } catch (err) { m.innerText = "Verbindung verloren."; }
+            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Modell-Fehler. Bitte prüfe v1/v1beta.";
+        } catch (err) { m.innerText = "Verbindung fehlgeschlagen."; }
         msgs.scrollTop = msgs.scrollHeight;
     }
+
+    // CHIPS ANKLICKBAR MACHEN
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.onclick = () => ask(chip.innerText);
+    });
 
     btn.onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
