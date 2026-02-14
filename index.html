@@ -9,53 +9,82 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     
     <style>
-        :root { --primary: #003366; --accent: #00aaff; --success: #22c55e; }
-        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
+        body { 
+            background-color: #f8fafc; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
 
-        .header-section { padding: 50px 0 30px; background: white; border-bottom: 1px solid #e2e8f0; text-align: center; }
-        .brand { font-weight: 800; font-size: 2.5rem; color: var(--primary); margin-bottom: 20px; }
-        .brand span { color: var(--accent); }
-        .search-container { max-width: 600px; margin: 0 auto; }
-        #searchInput { border-radius: 50px; padding: 15px 25px; border: 2px solid #cbd5e1; }
+        /* Schwebende Kacheln mit Bootstrap-Basis */
+        .post-card-container {
+            transition: transform 0.3s ease;
+        }
+        .post-card-container:hover {
+            transform: translateY(-8px);
+        }
 
-        .post-card-container { transition: transform 0.3s ease; }
-        .card { border: none; border-radius: 20px; overflow: hidden; background: white; box-shadow: 0 10px 20px rgba(0,0,0,0.05); height: 100%; }
-        .post-card-container:hover { transform: translateY(-10px); }
+        .card {
+            border: none !important;
+            border-radius: 1.25rem !important; /* Entspricht ca. 20px */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
 
-        .img-box { height: 180px; overflow: hidden; background: #e2e8f0; }
-        .card-img-top { width: 100%; height: 100%; object-fit: cover; }
+        /* Runde Suche */
+        .search-pill {
+            border-radius: 50px !important;
+            padding: 12px 25px !important;
+            border: 2px solid #e2e8f0 !important;
+        }
 
-        .btn-pill { border-radius: 50px; padding: 12px 20px; font-weight: 700; border: none; cursor: pointer !important; text-decoration: none !important; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
-        .btn-details { background: white; border: 2px solid var(--primary); color: var(--primary); }
-        .btn-start { background: var(--success); color: white; margin-left: 8px; }
+        /* Button Fix: Kein Strich, Hand-Maus */
+        .btn-pill {
+            border-radius: 50px !important;
+            font-weight: 700;
+            cursor: pointer !important;
+            text-decoration: none !important;
+        }
 
-        .modal-content { border-radius: 25px; border: none; }
+        .img-box {
+            height: 180px;
+            background: #cbd5e1;
+        }
+        .img-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
 
-    <header class="header-section">
-        <div class="container">
-            <div class="brand">BILDUNG<span>digital</span></div>
-            <div class="search-container">
-                <input type="text" id="searchInput" class="form-control" placeholder="Suchen...">
+    <header class="bg-white border-bottom py-5 mb-4">
+        <div class="container text-center">
+            <h1 class="display-5 fw-800 text-dark mb-4">
+                <span style="color: #003366;">BILDUNG</span><span style="color: #00aaff;">digital</span>
+            </h1>
+            <div class="mx-auto" style="max-width: 550px;">
+                <input type="text" id="searchInput" class="form-control search-pill shadow-sm" placeholder="🔍 Was möchtest du heute lernen?">
             </div>
         </div>
     </header>
 
-    <main class="container py-5">
-        <div id="posts-container" class="row g-4">
+    <main class="container">
+        <div id="posts-container" class="row g-4 justify-content-center">
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Inhalte werden geladen...</p>
             </div>
+        </div>
     </main>
 
-    <div class="modal fade" id="contentModal" tabindex="-1">
+    <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header">
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-content shadow-lg border-0" style="border-radius: 20px;">
+                <div class="modal-header border-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4 pt-0" id="modalTextContent"></div>
-                <div id="modalFooter" class="modal-footer border-0 d-block text-center pb-4"></div>
+                <div id="modalFooter" class="modal-footer border-0 pb-4 justify-content-center"></div>
             </div>
         </div>
     </div>
