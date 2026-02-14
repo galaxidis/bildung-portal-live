@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
 /**
- * 1. BEITRÄGE LADEN & DUMMY-BILDER GENERIEREN
+ * 1. BEITRÄGE LADEN & DUMMY-BILDER FIX
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -13,15 +13,22 @@ async function fetchPosts() {
         
         container.innerHTML = ""; 
 
-        posts.forEach(post => {
-            // --- DUMMY BILD LOGIK ---
-            // Wenn kein Bild von WP kommt, nehmen wir ein schönes Bild von Unsplash
-            const dummyKeywords = ["coding", "apps", "robotics", "tablet", "learning", "digital"];
-            const randomWord = dummyKeywords[post.id % dummyKeywords.length];
-            const fallbackImage = `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600&h=400&sig=${post.id}`;
+        posts.forEach((post, index) => {
+            // --- NEUE DUMMY BILD LOGIK (STABIL) ---
+            // Wir nutzen verschiedene Bild-IDs von Unsplash, die zum Thema passen
+            const imageIds = [
+                '1485856407642-7f9ba0f2085c', // Laptop/Code
+                '1454165833267-0e1e9c43fbb3', // Workspace
+                '1519389950473-47ba0277781c', // Team/Digital
+                '1501504905953-f841e0ad064c', // Education
+                '1498050108023-c5249f4df085', // Tablet/Dev
+                '1550745165-9bc0b252726f'  // Hardware/Robot
+            ];
+            const imageId = imageIds[index % imageIds.length];
+            const fallbackImage = `https://images.unsplash.com/photo-${imageId}?auto=format&fit=crop&q=80&w=600&h=400`;
             
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || fallbackImage;
-            // ------------------------
+            // --------------------------------------
 
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
@@ -32,8 +39,8 @@ async function fetchPosts() {
             card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
             
             card.innerHTML = `
-                <div class="h-44 overflow-hidden bg-slate-100">
-                    <img src="${media}" class="w-full h-full object-cover">
+                <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
+                    <img src="${media}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/600x400?text=Bildung+Digital'">
                 </div>
                 <div class="p-5 flex flex-col flex-grow">
                     <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
@@ -92,7 +99,6 @@ function performSearch() {
 
 /**
  * 3. MODAL (INHALT ÖFFNEN)
- * Stabilisierte Version ohne kompliziertes Clipping.
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
@@ -117,7 +123,6 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // Einbettung ohne Clipping für maximale Stabilität
             body.innerHTML = `
                 <div class="w-full bg-white rounded-2xl shadow-inner overflow-hidden" style="height: 65vh;">
                     <iframe 
