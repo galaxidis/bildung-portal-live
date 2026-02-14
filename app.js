@@ -1,8 +1,11 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
+
+// DEIN NEUER AI STUDIO KEY
+const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
 /**
  * 1. BEITRÄGE LADEN (DIE KACHELN)
+ * Bleiben exakt so, wie du sie liebst.
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -11,9 +14,13 @@ async function fetchPosts() {
         const res = await fetch(API_URL);
         const posts = await res.json();
         container.innerHTML = ""; 
+        
         posts.forEach((post) => {
-            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
+            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url 
+                          || `https://picsum.photos/seed/${post.id}/600/400`;
+            
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
+
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
@@ -29,11 +36,17 @@ async function fetchPosts() {
                         </div>
                     </div>
                 </div>`;
+            
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            if (hasH5P) {
+                col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            }
             container.appendChild(col);
         });
-    } catch (e) { console.error("Kachel-Fehler:", e); }
+        console.log("✅ Kacheln erfolgreich geladen.");
+    } catch (e) { 
+        console.error("Fehler beim Laden der Posts:", e);
+    }
 }
 
 /**
@@ -43,39 +56,48 @@ async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
+
     modal.classList.remove('hidden');
-    body.innerHTML = 'Lade Inhalt...';
+    body.innerHTML = '<div class="text-center py-20 italic">Wird geladen...</div>';
+    
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
+        
         let h5pId = null;
         if (post._embedded?.['wp:term']?.[1]) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
+
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+            body.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
+                <div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>
+            `;
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
 /**
- * 3. DER ULTIMATIVE KI-FIX (AUTO-DETECT)
+ * 3. CHAT-BOT LOGIK (FIX FÜR AI STUDIO KEY)
  */
 function initChat() {
+    const chatToggle = document.getElementById('chat-toggle');
     const chatWindow = document.getElementById('chat-window');
     const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
-    document.getElementById('chat-toggle')?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
+    chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
     async function askGemini(question) {
         const addMsg = (text, isBot = true) => {
             const m = document.createElement('div');
-            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto mb-2 text-xs text-right";
+            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs text-slate-800 mb-2" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs mb-2";
             m.innerText = text;
             msgArea.appendChild(m);
             msgArea.scrollTop = msgArea.scrollHeight;
@@ -84,46 +106,60 @@ function initChat() {
 
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("KI sucht Verbindung...");
+        const loadingMsg = addMsg("KI schreibt...");
 
-        // LISTE DER MODELLE, DIE WIR DURCHPROBIEREN
-        const models = [
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-pro",
-            "gemini-pro"
-        ];
+        try {
+            // Wir nutzen gemini-1.5-flash über die v1-Schnittstelle
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Antworte als hilfreicher Bildungsassistent kurz auf Deutsch: " + question }] }]
+                })
+            });
 
-        let success = false;
-
-        for (const modelName of models) {
-            if (success) break;
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }] })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.candidates) {
-                    loadingMsg.innerText = data.candidates[0].content.parts[0].text;
-                    success = true;
-                    console.log("✅ Erfolg mit Modell:", modelName);
-                } else {
-                    console.warn(`❌ Modell ${modelName} gescheitert, probiere nächstes...`);
-                }
-            } catch (err) {
-                console.error("Netzwerkfehler bei Modell:", modelName);
+            const data = await response.json();
+            
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                loadingMsg.innerText = data.candidates[0].content.parts[0].text;
+            } else {
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Antwort konnte nicht geladen werden.");
+                console.error("Google-Response:", data);
             }
-        }
-
-        if (!success) {
-            loadingMsg.innerText = "Alle Modelle blockiert. Bitte prüfe in der Google Cloud Console, ob die 'Generative Language API' aktiviert ist.";
+        } catch (err) {
+            loadingMsg.innerText = "Verbindung fehlgeschlagen.";
+            console.error(err);
         }
     }
 
-    document.getElementById('send-chat')?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    
+    // Chips klickbar machen
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.addEventListener('click', () => { 
+            chatInput.value = chip.innerText; 
+            askGemini(chip.innerText); 
+        });
+    });
 }
 
-document.addEventListener('DOMContentLoaded', () => { fetchPosts(); initChat(); });
+/**
+ * 4. START
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    fetchPosts();
+    initChat();
+    
+    document.getElementById('closeModal')?.addEventListener('click', () => {
+        document.getElementById('contentModal').classList.add('hidden');
+    });
+
+    document.getElementById('searchInput')?.addEventListener('input', () => {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        document.querySelectorAll('.hover-card').forEach(card => {
+            const title = card.querySelector('h5').innerText.toLowerCase();
+            card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
+        });
+    });
+});
