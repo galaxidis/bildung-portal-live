@@ -3,18 +3,18 @@ const KEY_URL = 'https://hub.bildungdigital.at/key.txt';
 let GEMINI_API_KEY = "";
 
 /**
- * 1. KEY LADEN
+ * 1. KEY VOM SERVER LADEN
  */
 async function loadApiKey() {
-    console.log("🔍 Lade Key von:", KEY_URL);
+    console.log("🔍 Detektiv: Lade Key von", KEY_URL);
     try {
         const response = await fetch(KEY_URL);
-        if (!response.ok) throw new Error(`Server-Status: ${response.status}`);
+        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
-        console.log("✅ Key bereit.");
+        console.log("✅ Key erfolgreich empfangen.");
     } catch (e) {
-        console.error("❌ Key-Ladefehler (CORS prüfen!):", e.message);
+        console.error("❌ Fehler beim Key-Laden:", e.message);
     }
 }
 
@@ -49,7 +49,7 @@ async function fetchPosts() {
             col.appendChild(card);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler beim Laden der Posts", e); }
+    } catch (e) { console.error("Fehler beim Post-Laden", e); }
 }
 
 /**
@@ -63,8 +63,8 @@ async function openContent(postId, directH5P) {
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        body.innerHTML = `<h2 class="text-2xl font-bold mb-4">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
-    } catch (e) { body.innerHTML = "Inhalt konnte nicht geladen werden."; }
+        body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
 function performSearch() {
@@ -99,7 +99,7 @@ function initChat() {
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) {
-            alert("KI-Key fehlt. Bitte prüfe die Konsole (F12).");
+            alert("API-Key nicht geladen. Bitte prüfe die key.txt im Stammverzeichnis.");
             return;
         }
 
@@ -114,29 +114,31 @@ function initChat() {
 
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("KI überlegt...");
+        const loadingMsg = addMsg("KI denkt nach...");
 
         try {
-            // Umstellung auf v1 für bessere Kompatibilität
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // WICHTIG: Nutzt jetzt v1 und das stabilere gemini-1.5-pro
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte als hilfreicher Assistent kurz auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte kurz und präzise auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                console.error("Google Fehler:", data);
-                loadingMsg.innerHTML = `<span class="text-red-500">Fehler: ${data.error?.message || 'Zugriff verweigert'}</span>`;
+                console.error("Detaillierter Google-Fehler:", data);
+                const reason = data.error?.message || "Unbekannter Fehler";
+                loadingMsg.innerHTML = `<span class="text-red-500">Google lehnt ab: ${reason}</span>`;
                 return;
             }
 
             loadingMsg.innerText = data.candidates[0].content.parts[0].text;
         } catch (err) {
-            loadingMsg.innerText = "Netzwerk-Fehler.";
+            console.error("Netzwerk-Fehler:", err);
+            loadingMsg.innerText = "Verbindung fehlgeschlagen.";
         }
     }
 
@@ -145,7 +147,7 @@ function initChat() {
 }
 
 /**
- * START
+ * START-SEQUENZ
  */
 document.addEventListener('DOMContentLoaded', async () => {
     await loadApiKey();
