@@ -9,58 +9,50 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     
     <style>
-        :root { --primary: #003366; --accent: #00aaff; --bg: #f8fafc; }
-        body { background-color: var(--bg); font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
+        :root { --primary: #003366; --accent: #00aaff; --success: #22c55e; }
+        body { background-color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
 
-        /* Header & Suche */
-        .header-section { padding: 60px 0 40px; background: white; border-bottom: 1px solid #e2e8f0; text-align: center; }
-        .brand { font-weight: 800; font-size: 2.5rem; color: var(--primary); margin-bottom: 25px; }
+        /* Header & Runde Suche */
+        .header-section { padding: 50px 0 30px; background: white; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .brand { font-weight: 800; font-size: 2.5rem; color: var(--primary); margin-bottom: 20px; }
         .brand span { color: var(--accent); }
-        
-        .search-container { max-width: 600px; margin: 0 auto; position: relative; }
+        .search-container { max-width: 600px; margin: 0 auto; }
         #searchInput { 
-            border-radius: 50px; padding: 15px 25px; border: 2px solid #e2e8f0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: 0.3s;
+            border-radius: 50px; padding: 15px 25px; border: 2px solid #cbd5e1;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: 0.3s;
         }
-        #searchInput:focus { border-color: var(--accent); outline: none; box-shadow: 0 4px 20px rgba(0,170,255,0.15); }
+        #searchInput:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 15px rgba(0,170,255,0.2); }
 
-        /* Schwebende Kacheln */
-        .post-card { 
-            border: none; border-radius: 20px; background: white; 
-            transition: all 0.3s ease; height: 100%; display: flex; flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
+        /* Schwebende Kacheln für Schüler */
+        .post-card-container { transition: transform 0.3s ease; }
+        .card { 
+            border: none; border-radius: 20px; overflow: hidden; background: white; 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05); height: 100%; transition: all 0.3s ease;
+            cursor: default;
         }
-        .post-card:hover { transform: translateY(-10px); box-shadow: 0 20px 35px rgba(0,0,0,0.1); }
+        /* Der "Schwebende" Effekt */
+        .post-card-container:hover { transform: translateY(-10px); }
+        .post-card-container:hover .card { box-shadow: 0 15px 30px rgba(0,0,0,0.12); }
+
+        .img-box { height: 180px; overflow: hidden; background: #e2e8f0; }
+        .card-img-top { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Buttons mit Hand-Cursor (Pointer) */
+        .btn-pill { 
+            border-radius: 50px; padding: 12px 20px; font-weight: 700; 
+            border: none; cursor: pointer !important; /* Erzwingt die Hand */
+            text-decoration: none !important; transition: 0.2s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn-details { background: white; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-details:hover { background: var(--primary); color: white; }
         
-        .img-container { height: 200px; overflow: hidden; border-radius: 20px 20px 0 0; }
-        .img-container img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .btn-pill { border-radius: 50px; padding: 10px 20px; font-weight: 700; transition: 0.3s; text-decoration: none !important; }
-        .btn-start { background: #22c55e; color: white !important; border: none; }
-        .btn-details { border: 2px solid var(--primary); color: var(--primary) !important; background: transparent; }
+        .btn-start { background: var(--success); color: white; box-shadow: 0 4px 10px rgba(34,197,94,0.3); }
+        .btn-start:hover { background: #16a34a; transform: scale(1.05); }
 
-        /* Chat Button & Fenster */
-        #chat-widget { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
-        #chat-button { 
-            width: 60px; height: 60px; border-radius: 50%; background: var(--primary); 
-            color: white; border: none; box-shadow: 0 5px 20px rgba(0,0,0,0.2); cursor: pointer; font-size: 24px;
-        }
-        #chat-window { 
-            position: fixed; bottom: 100px; right: 30px; width: 350px; height: 500px; 
-            background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            display: none; flex-direction: column; overflow: hidden;
-        }
-        .chat-header { background: var(--primary); color: white; padding: 15px; font-weight: 700; }
-        .chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; background: #f1f5f9; }
-        .chat-footer { padding: 15px; border-top: 1px solid #eee; }
-        .suggestion-chip { 
-            display: inline-block; padding: 5px 12px; background: #e2e8f0; 
-            border-radius: 20px; font-size: 0.8rem; margin: 4px; cursor: pointer; transition: 0.2s;
-        }
-        .suggestion-chip:hover { background: var(--accent); color: white; }
-
-        /* Modal Fix */
-        .modal-content { border-radius: 25px; border: none; }
+        /* Modal Design */
+        .modal-content { border-radius: 25px; border: none; overflow: hidden; }
+        .modal-header { border: none; }
     </style>
 </head>
 <body>
@@ -76,31 +68,19 @@
 
     <main class="container py-5">
         <div id="posts-container" class="row g-4">
-            </div>
-    </main>
-
-    <div id="chat-widget">
-        <div id="chat-window">
-            <div class="chat-header">BILDUNGdigital Assistent</div>
-            <div class="chat-body" id="chatMessages">
-                <p>Hallo! Ich helfe dir gerne. Hier sind ein paar Themen:</p>
-                <div id="suggestions">
-                    <span class="suggestion-chip">KI im Unterricht</span>
-                    <span class="suggestion-chip">Digitale Tools</span>
-                    <span class="suggestion-chip">H5P Übungen</span>
-                </div>
-            </div>
-            <div class="chat-footer">
-                <input type="text" id="chatInput" class="form-control rounded-pill" placeholder="Frag mich etwas...">
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-2 text-muted">Portal wird geladen...</p>
             </div>
         </div>
-        <button id="chat-button">💬</button>
-    </div>
+    </main>
 
     <div class="modal fade" id="contentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content shadow-lg">
-                <div class="modal-header border-0 pb-0"><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-header">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
                 <div class="modal-body p-4 pt-0" id="modalTextContent"></div>
                 <div id="modalFooter" class="modal-footer border-0 d-block text-center pb-4"></div>
             </div>
