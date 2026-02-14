@@ -56,21 +56,47 @@ async function fetchPosts() {
 }
 
 /**
- * 2. SUCH-LOGIK: FILTERT DIE KACHELN
+ * 2. SUCH-LOGIK: FILTERT DIE KACHELN + NEGATIV-MELDUNG
  */
 function performSearch() {
     const term = document.getElementById('searchInput').value.toLowerCase();
-    const cards = document.querySelectorAll('#posts-container > div');
+    const container = document.getElementById('posts-container');
+    const cards = document.querySelectorAll('#posts-container > div:not(#no-results-msg)');
     
+    let foundAny = false;
+
     cards.forEach(card => {
-        // Wir suchen im Titel (h5)
         const title = card.querySelector('h5').innerText.toLowerCase();
         if (title.includes(term)) {
             card.style.display = 'flex';
+            foundAny = true;
         } else {
             card.style.display = 'none';
         }
     });
+
+    // Prüfen, ob bereits eine Meldung existiert, und diese entfernen
+    const existingMsg = document.getElementById('no-results-msg');
+    if (existingMsg) existingMsg.remove();
+
+    // Wenn nichts gefunden wurde, Meldung anzeigen
+    if (!foundAny && term.length > 0) {
+        const msg = document.createElement('div');
+        msg.id = 'no-results-msg';
+        msg.className = 'col-span-full text-center py-20 animate-pulse';
+        msg.innerHTML = `
+            <div class="bg-slate-100 rounded-[2rem] p-10 border-2 border-dashed border-slate-200">
+                <span class="text-5xl">🔍</span>
+                <h3 class="text-2xl font-bold text-[#003366] mt-4">Nichts gefunden...</h3>
+                <p class="text-slate-500 mt-2">Probier es mal mit einem anderen Wort oder schau dir unsere Themen an.</p>
+                <button onclick="document.getElementById('searchInput').value=''; performSearch();" 
+                        class="mt-6 px-6 py-2 bg-[#00aaff] text-white rounded-full font-bold cursor-pointer hover:bg-[#003366] transition-colors">
+                    Alle Inhalte zeigen
+                </button>
+            </div>
+        `;
+        container.appendChild(msg);
+    }
 }
 
 /**
@@ -92,7 +118,7 @@ async function openContent(postId, directH5P) {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         
-        // H5P ID aus den Schlagworten/Tags extrahieren
+        // H5P ID aus den Schlagworten extrahieren
         let h5pId = null;
         if (post._embedded?.['wp:term']) {
             const tags = post._embedded['wp:term'][1] || [];
@@ -101,14 +127,14 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // H5P MODUS: Mit Fix gegen schwarze "Check out more" Balken
+            // H5P MODUS: Fix gegen schwarze "Check out more" Balken
             body.innerHTML = `
                 <div class="aspect-video w-full rounded-2xl overflow-hidden shadow-lg bg-black">
                     <iframe 
                         src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
                         class="w-full h-full border-0" 
                         allowfullscreen 
-                        style="display: block;"
+                        style="display: block; width: 100%; height: 100%; overflow: hidden;"
                         scrolling="no">
                     </iframe>
                 </div>`;
@@ -145,11 +171,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const sBtn = document.getElementById('searchButton');
     
     if (sInput) {
-        sInput.oninput = performSearch;
-        sInput.onkeydown = (e) => { if (e.key === 'Enter') performSearch(); };
+        sInput.addEventListener('input', performSearch);
+        sInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performSearch(); 
+            }
+        });
     }
     if (sBtn) {
-        sBtn.onclick = performSearch;
+        sBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            performSearch();
+        });
     }
     
     // 3. Modal Schließen-Button
