@@ -1,32 +1,20 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-/**
- * 1. BEITRÄGE LADEN
- */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
-
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
-        
-        container.innerHTML = ""; // Spinner entfernen
-
+        container.innerHTML = ""; 
         posts.forEach(post => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
-            
             const col = document.createElement('div');
-            col.className = 'w-full'; 
-
             const card = document.createElement('div');
             card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
-            
             card.innerHTML = `
-                <div class="h-44 overflow-hidden bg-slate-200">
-                    <img src="${media}" class="w-full h-full object-cover">
-                </div>
+                <div class="h-44 overflow-hidden bg-slate-200"><img src="${media}" class="w-full h-full object-cover"></div>
                 <div class="p-5 flex flex-col flex-grow">
                     <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
                     <div class="flex gap-2 mt-auto">
@@ -34,74 +22,47 @@ async function fetchPosts() {
                         ${hasH5P ? `<button class="js-start flex-1 py-2 rounded-full bg-[#22c55e] text-white font-bold cursor-pointer hover:bg-[#16a34a] shadow-sm transition-all">🚀 Start</button>` : ''}
                     </div>
                 </div>`;
-            
             card.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
-            
             col.appendChild(card);
             container.appendChild(col);
         });
-    } catch (e) {
-        console.error("Ladefehler:", e);
-        container.innerHTML = "<p class='text-center py-10 col-span-full'>Inhalte konnten nicht geladen werden.</p>";
-    }
+    } catch (e) { container.innerHTML = "Fehler beim Laden."; }
 }
 
-/**
- * 2. SUCHE MIT NEGATIV-MELDUNG
- */
 function performSearch() {
     const sInput = document.getElementById('searchInput');
     const term = sInput ? sInput.value.toLowerCase().trim() : "";
     const container = document.getElementById('posts-container');
     const cards = container.querySelectorAll('.hover-card');
-    
     let visibleCount = 0;
-
     cards.forEach(card => {
         const title = card.querySelector('h5').innerText.toLowerCase();
-        if (title.includes(term)) {
-            card.parentElement.style.display = 'block';
-            visibleCount++;
-        } else {
-            card.parentElement.style.display = 'none';
-        }
+        card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
+        if (title.includes(term)) visibleCount++;
     });
-
     const existingMsg = document.getElementById('no-results-msg');
     if (existingMsg) existingMsg.remove();
-
     if (visibleCount === 0 && term !== "") {
         const msg = document.createElement('div');
         msg.id = 'no-results-msg';
         msg.className = 'col-span-full text-center py-12 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200';
-        msg.innerHTML = `
-            <h3 class="text-xl font-bold text-[#003366]">Nichts gefunden für "${term}"</h3>
-            <button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle Inhalte zeigen</button>
-        `;
+        msg.innerHTML = `<h3 class="text-xl font-bold text-[#003366]">Nichts gefunden</h3><button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle anzeigen</button>`;
         container.appendChild(msg);
     }
 }
 
-/**
- * 3. MODAL (INHALT ÖFFNEN)
- * Mit clip-path Fix gegen den weißen Bereich und H5P-Zusatzinhalte.
- */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
-    
-    if (!modal) return;
-
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-10"><div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00aaff] border-r-transparent"></div></div>';
+    body.innerHTML = '<div class="text-center py-10">Lade Inhalt...</div>';
     footer.innerHTML = "";
 
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        
         let h5pId = null;
         if (post._embedded?.['wp:term']) {
             const tags = post._embedded['wp:term'][1] || [];
@@ -110,55 +71,36 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // SMART-CLIP FIX:
-            // Schneidet exakt die untersten 60px ab, um Menüs zu verstecken.
-            // Padding-bottom sorgt für das 16:9 Verhältnis.
+            // SAUBERER H5P-IFRAME (Ohne Clipping-Experimente, die Text erzeugen könnten)
             body.innerHTML = `
-                <div style="position: relative; width: 100%; padding-bottom: 56.25%; overflow: hidden; border-radius: 1.5rem; background: #ffffff;">
+                <div class="w-full bg-white rounded-2xl shadow-inner overflow-hidden" style="height: 60vh;">
                     <iframe 
                         src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; clip-path: inset(0 0 60px 0);" 
-                        allowfullscreen 
-                        scrolling="no">
+                        class="w-full h-full border-0" 
+                        allowfullscreen>
                     </iframe>
                 </div>`;
         } else {
-            body.innerHTML = `
-                <h2 class="text-3xl font-extrabold text-[#003366] mb-6 leading-tight">${post.title.rendered}</h2>
-                <div class="prose prose-slate max-w-none text-lg text-slate-600">
-                    ${post.content.rendered}
-                </div>`;
-            
+            body.innerHTML = `<h2 class="text-3xl font-extrabold text-[#003366] mb-6">${post.title.rendered}</h2><div class="prose max-w-none text-lg text-slate-600">${post.content.rendered}</div>`;
             if (h5pId) {
                 const btn = document.createElement('button');
-                btn.className = "px-10 py-4 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer hover:bg-[#16a34a] shadow-lg transition-all text-xl";
+                btn.className = "px-10 py-4 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer hover:bg-[#16a34a] shadow-lg text-xl";
                 btn.innerText = "🚀 Übung jetzt starten";
                 btn.onclick = () => openContent(post.id, true);
                 footer.appendChild(btn);
             }
         }
-    } catch (e) {
-        body.innerHTML = "<p class='text-center text-red-500'>Fehler beim Laden.</p>";
-    }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
-/**
- * 4. INITIALISIERUNG
- */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
-    
     const sInput = document.getElementById('searchInput');
     const sBtn = document.getElementById('searchButton');
-    
     if (sInput) sInput.oninput = performSearch;
     if (sBtn) sBtn.onclick = performSearch;
-    
-    const closeBtn = document.getElementById('closeModal');
-    if (closeBtn) {
-        closeBtn.onclick = () => {
-            document.getElementById('contentModal').classList.add('hidden');
-            document.getElementById('modalTextContent').innerHTML = "";
-        };
-    }
+    document.getElementById('closeModal').onclick = () => {
+        document.getElementById('contentModal').classList.add('hidden');
+        document.getElementById('modalTextContent').innerHTML = "";
+    };
 });
