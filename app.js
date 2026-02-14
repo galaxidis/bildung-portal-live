@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-// 1. MODAL SCHLIESSEN (GLOBAL)
+// 1. MODAL-STEUERUNG
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -10,7 +10,7 @@ function closeModal() {
     }
 }
 
-// 2. KACHELN LADEN (H5P-Sicherung aktiv)
+// 2. BEITRÄGE LADEN (Kacheln & H5P-Start)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -21,7 +21,6 @@ async function fetchPosts() {
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
-            
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
@@ -37,48 +36,40 @@ async function fetchPosts() {
                         </div>
                     </div>
                 </div>`;
-            
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) {
-                col.querySelector('.js-start').onclick = () => openContent(post.id, true);
-            }
+            if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Kacheln fehlerhaft:", e); }
+    } catch (e) { console.error("Fehler Kacheln:", e); }
 }
 
-// 3. INHALT ÖFFNEN (H5P-RETTUNG)
+// 3. INHALT ÖFFNEN (Inkl. H5P Iframe)
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="p-10 text-center italic">Wird geladen...</div>';
-    
+    body.innerHTML = 'Wird geladen...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        
         let h5pId = null;
         if (post._embedded?.['wp:term']?.[1]) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
-
         if (directH5P && h5pId) {
-            // H5P Pfad fixiert
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Ladefehler."; }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
-// 4. CHAT-BOT (ENDGÜLTIGER MODEL-FIX)
+// 4. CHAT-BOT (Vorschläge anklickbar & funktionierende API)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
-    const btn = document.getElementById('send-chat');
     const msgs = document.getElementById('chat-messages');
 
     document.getElementById('chat-toggle').onclick = () => win.classList.toggle('hidden');
@@ -94,29 +85,28 @@ function initChat() {
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
-            // Wir nutzen jetzt v1 (Stable) und gemini-1.5-flash (Universal)
+            // Wir nutzen genau den Pfad, der bei dir gerade den Erfolg gebracht hat!
             const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte sehr kurz auf Deutsch: " + q }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + q }] }] })
             });
-
             const data = await response.json();
-            if (data.candidates && data.candidates[0].content) {
-                m.innerText = data.candidates[0].content.parts[0].text;
-            } else {
-                m.innerText = "Fehler: " + (data.error?.message || "Modell-Konfiguration prüfen.");
-            }
+            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Fehler in der Antwort.";
         } catch (err) { m.innerText = "Verbindung unterbrochen."; }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // CHIPS ANKLICKBAR MACHEN (Wichtig!)
+    // JETZT: Vorschläge (Chips) anklickbar machen
     document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.onclick = () => ask(chip.innerText);
+        chip.style.cursor = "pointer";
+        chip.onclick = () => {
+            const text = chip.innerText;
+            ask(text);
+        };
     });
 
-    btn.onclick = () => ask(input.value);
+    document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
 
