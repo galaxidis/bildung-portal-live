@@ -1,6 +1,6 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-// HIER DEINEN KEY EINTRAGEN (Zwischen die Anführungszeichen)
+// DEINEN KEY HIER EINTRAGEN
 const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
 
 /**
@@ -8,7 +8,10 @@ const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4";
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
-    if (!container) return;
+    if (!container) {
+        console.error("Fehler: #posts-container nicht gefunden!");
+        return;
+    }
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
@@ -43,14 +46,15 @@ async function fetchPosts() {
             
             container.appendChild(col);
         });
-        console.log("✅ Kacheln erfolgreich geladen.");
+        console.log("✅ Kacheln sind wieder da!");
     } catch (e) { 
         console.error("Fehler beim Laden der Posts:", e);
+        container.innerHTML = "Fehler beim Laden der Kacheln.";
     }
 }
 
 /**
- * 2. MODAL ÖFFNEN (TEXT ODER H5P)
+ * 2. MODAL ÖFFNEN
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
@@ -78,13 +82,11 @@ async function openContent(postId, directH5P) {
                 <div class="prose max-w-none text-slate-700">${post.content.rendered}</div>
             `;
         }
-    } catch (e) { 
-        body.innerHTML = "Fehler beim Laden des Inhalts."; 
-    }
+    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
 /**
- * 3. CHAT-BOT LOGIK (FIX FÜR V1BETA)
+ * 3. CHAT-BOT LOGIK (STABIL MIT V1BETA)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -105,7 +107,7 @@ function initChat() {
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("DEIN_AIZA")) {
-            alert("Bitte API-Key in der app.js eintragen!");
+            alert("API-Key fehlt in der app.js!");
             return;
         }
         
@@ -123,26 +125,23 @@ function initChat() {
         const loadingMsg = addMsg("Ich überlege...");
 
         try {
-            // HIER IST DER FIX: v1beta statt v1
+            // v1beta ist oft der Schlüssel für neuere Keys
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz und freundlich auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
-            
             if (data.candidates && data.candidates[0].content.parts[0].text) {
                 loadingMsg.innerText = data.candidates[0].content.parts[0].text;
             } else {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Keine Antwort von der KI.");
-                console.error("Google-Response:", data);
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Check Console");
             }
         } catch (err) {
             loadingMsg.innerText = "Verbindung fehlgeschlagen.";
-            console.error(err);
         }
     }
 
@@ -151,23 +150,21 @@ function initChat() {
 }
 
 /**
- * 4. INITIALISIERUNG
+ * 4. START
  */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
     
-    // Suche
+    document.getElementById('closeModal')?.addEventListener('click', () => {
+        document.getElementById('contentModal').classList.add('hidden');
+    });
+
     document.getElementById('searchInput')?.addEventListener('input', () => {
         const term = document.getElementById('searchInput').value.toLowerCase().trim();
         document.querySelectorAll('.hover-card').forEach(card => {
             const title = card.querySelector('h5').innerText.toLowerCase();
             card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
         });
-    });
-
-    // Modal Schließen
-    document.getElementById('closeModal')?.addEventListener('click', () => {
-        document.getElementById('contentModal').classList.add('hidden');
     });
 });
