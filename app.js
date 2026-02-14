@@ -1,10 +1,10 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-// HIER DEINEN KEY EINTRAGEN
+// Dein Key ist jetzt fest integriert
 const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
 
 /**
- * 1. BEITRÄGE LADEN (KACHELN-SICHERUNG)
+ * 1. BEITRÄGE LADEN (DIE KACHELN)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -40,10 +40,9 @@ async function fetchPosts() {
             if (hasH5P) {
                 col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             }
-            
             container.appendChild(col);
         });
-        console.log("✅ Kacheln geladen.");
+        console.log("✅ Kacheln aktiv.");
     } catch (e) { 
         console.error("Fehler Posts:", e);
     }
@@ -58,7 +57,7 @@ async function openContent(postId, directH5P) {
     if (!modal || !body) return;
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-20 italic">Inhalt wird geladen...</div>';
+    body.innerHTML = '<div class="text-center py-20 italic">Wird geladen...</div>';
     
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
@@ -73,16 +72,13 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `
-                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
-                <div class="prose max-w-none text-slate-700">${post.content.rendered}</div>
-            `;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
         }
     } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
 /**
- * 3. CHAT-BOT LOGIK (FIX MIT -LATEST)
+ * 3. CHAT-BOT (ROBUSTE ANBINDUNG)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -94,22 +90,10 @@ function initChat() {
     chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
-    document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.addEventListener('click', () => { 
-            chatInput.value = chip.innerText; 
-            askGemini(chip.innerText); 
-        });
-    });
-
     async function askGemini(question) {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("DEIN_AIZA")) {
-            alert("API-Key fehlt!");
-            return;
-        }
-        
         const addMsg = (text, isBot = true) => {
             const m = document.createElement('div');
-            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs text-slate-800 mb-2" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs mb-2";
+            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs mb-2" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs mb-2";
             m.innerText = text;
             msgArea.appendChild(m);
             msgArea.scrollTop = msgArea.scrollHeight;
@@ -118,15 +102,15 @@ function initChat() {
 
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("Ich überlege...");
+        const loadingMsg = addMsg("KI denkt nach...");
 
+        // Wir probieren gemini-1.5-pro, da Flash in deinem Projekt den "Not Found" Fehler wirft
         try {
-            // DER FIX: gemini-1.5-flash-latest in der URL
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte als Bildungsassistent kurz auf Deutsch: " + question }] }]
                 })
             });
 
@@ -134,11 +118,10 @@ function initChat() {
             if (data.candidates && data.candidates[0].content.parts[0].text) {
                 loadingMsg.innerText = data.candidates[0].content.parts[0].text;
             } else {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Check Console");
-                console.log("Full Error Data:", data);
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Modell-Zugriff verweigert.");
             }
         } catch (err) {
-            loadingMsg.innerText = "Verbindung fehlgeschlagen.";
+            loadingMsg.innerText = "Verbindungsproblem.";
         }
     }
 
@@ -146,22 +129,10 @@ function initChat() {
     chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
 }
 
-/**
- * 4. INITIALISIERUNG
- */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    
     document.getElementById('closeModal')?.addEventListener('click', () => {
         document.getElementById('contentModal').classList.add('hidden');
-    });
-
-    document.getElementById('searchInput')?.addEventListener('input', () => {
-        const term = document.getElementById('searchInput').value.toLowerCase().trim();
-        document.querySelectorAll('.hover-card').forEach(card => {
-            const title = card.querySelector('h5').innerText.toLowerCase();
-            card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
-        });
     });
 });
