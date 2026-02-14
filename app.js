@@ -1,17 +1,14 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-// DEINEN KEY HIER EINTRAGEN
+// HIER DEINEN KEY EINTRAGEN
 const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
 
 /**
- * 1. BEITRÄGE LADEN (DIE KACHELN)
+ * 1. BEITRÄGE LADEN (KACHELN-SICHERUNG)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
-    if (!container) {
-        console.error("Fehler: #posts-container nicht gefunden!");
-        return;
-    }
+    if (!container) return;
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
@@ -46,10 +43,9 @@ async function fetchPosts() {
             
             container.appendChild(col);
         });
-        console.log("✅ Kacheln sind wieder da!");
+        console.log("✅ Kacheln geladen.");
     } catch (e) { 
-        console.error("Fehler beim Laden der Posts:", e);
-        container.innerHTML = "Fehler beim Laden der Kacheln.";
+        console.error("Fehler Posts:", e);
     }
 }
 
@@ -86,7 +82,7 @@ async function openContent(postId, directH5P) {
 }
 
 /**
- * 3. CHAT-BOT LOGIK (STABIL MIT V1BETA)
+ * 3. CHAT-BOT LOGIK (FIX MIT -LATEST)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -107,7 +103,7 @@ function initChat() {
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("DEIN_AIZA")) {
-            alert("API-Key fehlt in der app.js!");
+            alert("API-Key fehlt!");
             return;
         }
         
@@ -125,8 +121,8 @@ function initChat() {
         const loadingMsg = addMsg("Ich überlege...");
 
         try {
-            // v1beta ist oft der Schlüssel für neuere Keys
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // DER FIX: gemini-1.5-flash-latest in der URL
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -139,6 +135,7 @@ function initChat() {
                 loadingMsg.innerText = data.candidates[0].content.parts[0].text;
             } else {
                 loadingMsg.innerText = "Fehler: " + (data.error?.message || "Check Console");
+                console.log("Full Error Data:", data);
             }
         } catch (err) {
             loadingMsg.innerText = "Verbindung fehlgeschlagen.";
@@ -150,7 +147,7 @@ function initChat() {
 }
 
 /**
- * 4. START
+ * 4. INITIALISIERUNG
  */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
