@@ -2,24 +2,18 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 const KEY_URL = 'https://hub.bildungdigital.at/key.txt'; 
 let GEMINI_API_KEY = "";
 
-/**
- * 1. KEY LADEN
- */
 async function loadApiKey() {
     try {
         const response = await fetch(KEY_URL);
-        if (!response.ok) throw new Error(`Server-Status: ${response.status}`);
+        if (!response.ok) throw new Error("Key-Datei nicht lesbar");
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
         console.log("✅ Key geladen.");
     } catch (e) {
-        console.error("❌ Key-Fehler:", e.message);
+        console.error("❌ Fehler:", e.message);
     }
 }
 
-/**
- * 2. BEITRÄGE LADEN
- */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -48,22 +42,19 @@ async function fetchPosts() {
             col.appendChild(card);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler beim Post-Laden", e); }
+    } catch (e) { console.error(e); }
 }
 
-/**
- * 3. MODAL & SUCHE
- */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     modal.classList.remove('hidden');
-    body.innerHTML = 'Wird geladen...';
+    body.innerHTML = 'Laden...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
 function performSearch() {
@@ -74,30 +65,22 @@ function performSearch() {
     });
 }
 
-/**
- * 4. CHAT-BOT (FINALE ANPASSUNG)
- */
 function initChat() {
-    const chatToggle = document.getElementById('chat-toggle');
-    const chatWindow = document.getElementById('chat-window');
     const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
-    chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
-    document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
+    document.getElementById('chat-toggle')?.addEventListener('click', () => document.getElementById('chat-window').classList.toggle('hidden'));
+    document.getElementById('close-chat')?.addEventListener('click', () => document.getElementById('chat-window').classList.add('hidden'));
 
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.addEventListener('click', () => { 
-            const q = chip.innerText;
-            chatInput.value = q;
-            askGemini(q); 
+            chatInput.value = chip.innerText;
+            askGemini(chip.innerText); 
         });
     });
 
     async function askGemini(question) {
         if (!GEMINI_API_KEY) return;
-
         const addMsg = (text, isBot = true) => {
             const m = document.createElement('div');
             m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs";
@@ -106,14 +89,13 @@ function initChat() {
             msgArea.scrollTop = msgArea.scrollHeight;
             return m;
         };
-
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("KI überlegt...");
+        const loadingMsg = addMsg("KI antwortet...");
 
         try {
-            // Wir nutzen hier gemini-1.5-flash-8b (sehr stabil in v1)
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_API_KEY}`, {
+            // WICHTIG: Zurück auf v1beta, aber mit gemini-1.5-flash (der Standard für Gratis-Keys)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -122,43 +104,21 @@ function initChat() {
             });
 
             const data = await response.json();
-
-            if (!response.ok) {
-                // Wenn auch 8b nicht geht, probieren wir das Standard-Pro Modell
-                console.warn("Versuche Fallback-Modell...");
-                const retry = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: question }] }] })
-                });
-                const retryData = await retry.json();
-                if (retryData.candidates) {
-                    loadingMsg.innerText = retryData.candidates[0].content.parts[0].text;
-                    return;
-                }
-                throw new Error(data.error?.message || "Modell-Fehler");
-            }
-
+            if (!response.ok) throw new Error(data.error?.message || "Google-Fehler");
             loadingMsg.innerText = data.candidates[0].content.parts[0].text;
         } catch (err) {
-            loadingMsg.innerHTML = `<span class="text-red-500">Google-Fehler: ${err.message}</span>`;
+            loadingMsg.innerHTML = `<span class="text-red-500">Fehler: ${err.message}</span>`;
         }
     }
 
-    sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    document.getElementById('send-chat')?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
     chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
 }
 
-/**
- * START
- */
 document.addEventListener('DOMContentLoaded', async () => {
     await loadApiKey();
     fetchPosts();
     initChat();
-    
     document.getElementById('searchInput')?.addEventListener('input', performSearch);
-    document.getElementById('closeModal')?.addEventListener('click', () => {
-        document.getElementById('contentModal').classList.add('hidden');
-    });
+    document.getElementById('closeModal')?.addEventListener('click', () => document.getElementById('contentModal').classList.add('hidden'));
 });
