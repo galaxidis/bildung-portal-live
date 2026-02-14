@@ -10,7 +10,7 @@ function closeModal() {
     }
 }
 
-// 2. KACHELN LADEN
+// 2. BEITRÄGE LADEN (DIE KACHELN)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -21,6 +21,7 @@ async function fetchPosts() {
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
+            
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
@@ -36,26 +37,29 @@ async function fetchPosts() {
                         </div>
                     </div>
                 </div>`;
+            
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            if (hasH5P) {
+                col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            }
             container.appendChild(col);
         });
     } catch (e) { console.error("Kachel-Fehler:", e); }
 }
 
-// 3. INHALT ÖFFNEN (H5P-FIX INKLUSIVE)
+// 3. INHALT ÖFFNEN (DER FIX FÜR H5P UND POPUP)
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = 'Wird geladen...';
+    body.innerHTML = '<div class="p-10 text-center italic">Inhalt wird geladen...</div>';
     
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
         
-        // H5P ID EXTRAKTION
+        // H5P ID EXTRAKTION AUS DEN TAGS
         let h5pId = null;
         if (post._embedded?.['wp:term']?.[1]) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
@@ -63,15 +67,22 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // FIX: Sauberer iframe für H5P
-            body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
+            // DER FIX: Saubere H5P Einbindung
+            body.innerHTML = `
+                <div class="w-full h-[70vh]">
+                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
+                            class="w-full h-full border-0" 
+                            allowfullscreen></iframe>
+                </div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
+            body.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
+                <div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
         }
     } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
-// 4. CHAT-BOT (UMSTELLUNG AUF GEMINI-PRO)
+// 4. CHAT-BOT (FIX: GEMINI-PRO NUTZEN)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -91,7 +102,7 @@ function initChat() {
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
-            // WIR WECHSELN AUF gemini-pro (STABILER FÜR V1BETA)
+            // WECHSEL AUF gemini-pro (STABILER FÜR V1BETA UND DEINEN KEY)
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -99,7 +110,7 @@ function initChat() {
             });
 
             const data = await response.json();
-            if (data.candidates) {
+            if (data.candidates && data.candidates[0].content) {
                 m.innerText = data.candidates[0].content.parts[0].text;
             } else {
                 m.innerText = "Fehler: " + (data.error?.message || "Modell nicht erreichbar.");
