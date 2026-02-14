@@ -2,18 +2,18 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
 /**
- * 1. MODAL-STEUERUNG (FIX)
+ * 1. MODAL-STEUERUNG (BOMBENFEST)
  */
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
         modal.classList.add('hidden');
-        document.getElementById('modalTextContent').innerHTML = ""; // Inhalt leeren für sauberes Re-Opening
+        document.getElementById('modalTextContent').innerHTML = ""; 
     }
 }
 
 /**
- * 2. BEITRÄGE LADEN
+ * 2. BEITRÄGE LADEN (DIE KACHELN)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -67,13 +67,13 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none font-sans">${post.content.rendered}</div>`;
         }
     } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
 /**
- * 4. CHAT-BOT
+ * 4. CHAT-BOT (V1 MIT GEMINI-PRO)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -94,19 +94,30 @@ function initChat() {
             msgArea.scrollTop = msgArea.scrollHeight;
             return m;
         };
+
         addMsg(question, false);
         chatInput.value = "";
         const loadingMsg = addMsg("KI schreibt...");
+
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Kurze Antwort: " + question }] }] })
+            // Wir nutzen hier /v1/ und gemini-pro - das ist der stabilste Pfad für AI Studio Keys
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }] })
             });
+
             const data = await response.json();
-            loadingMsg.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Fehler bei der Antwort.";
-        } catch (err) { loadingMsg.innerText = "Fehler."; }
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                loadingMsg.innerText = data.candidates[0].content.parts[0].text;
+            } else {
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Modell nicht erreichbar.");
+            }
+        } catch (err) { loadingMsg.innerText = "Verbindung fehlgeschlagen."; }
     }
+
     sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
 }
 
 /**
@@ -116,15 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
     
-    // Fix für alle Schließen-Buttons (Modal + Chat)
-    document.getElementById('closeModal')?.addEventListener('click', closeModal);
-    
-    // Suche
-    document.getElementById('searchInput')?.addEventListener('input', () => {
-        const term = document.getElementById('searchInput').value.toLowerCase().trim();
-        document.querySelectorAll('.hover-card').forEach(card => {
-            const title = card.querySelector('h5').innerText.toLowerCase();
-            card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
-        });
-    });
+    // Der Button im HTML muss id="closeModal" haben
+    const closeBtn = document.getElementById('closeModal');
+    if (closeBtn) {
+        closeBtn.onclick = closeModal;
+    }
 });
