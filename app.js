@@ -4,13 +4,10 @@ const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0";
 // 1. MODAL SCHLIESSEN
 function closeModal() {
     const modal = document.getElementById('contentModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        document.getElementById('modalTextContent').innerHTML = ""; 
-    }
+    if (modal) modal.classList.add('hidden');
 }
 
-// 2. KACHELN LADEN
+// 2. KACHELN LADEN (H5P-Sicher)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -21,7 +18,6 @@ async function fetchPosts() {
         posts.forEach((post) => {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
-            
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
@@ -37,7 +33,6 @@ async function fetchPosts() {
                         </div>
                     </div>
                 </div>`;
-            
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
@@ -45,14 +40,13 @@ async function fetchPosts() {
     } catch (e) { console.error("Kachel-Fehler:", e); }
 }
 
-// 3. INHALT ÖFFNEN
+// 3. INHALT ÖFFNEN (FIXED H5P)
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="p-10 text-center">Lade Inhalt...</div>';
-    
+    body.innerHTML = 'Wird geladen...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -61,20 +55,18 @@ async function openContent(postId, directH5P) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
-
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
     } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (FIX: VERSION V1 + CHIPS ANKLICKBAR)
+// 4. CHAT-BOT (INTELLIGENTE MODELL-SUCHE)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
-    const btn = document.getElementById('send-chat');
     const msgs = document.getElementById('chat-messages');
 
     document.getElementById('chat-toggle').onclick = () => win.classList.toggle('hidden');
@@ -84,31 +76,44 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "KI denkt nach...";
+        m.innerText = "Verbindung wird geprüft...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
-        try {
-            // FIX: Wir nutzen /v1/ und gemini-1.5-flash (Standard für AI Studio Keys)
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Kurze Antwort auf Deutsch: " + q }] }] })
-            });
+        // Wir probieren die zwei wahrscheinlichsten Kombinationen nacheinander
+        const endpoints = [
+            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`
+        ];
 
-            const data = await response.json();
-            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Modell-Fehler. Bitte prüfe v1/v1beta.";
-        } catch (err) { m.innerText = "Verbindung fehlgeschlagen."; }
+        let success = false;
+        for (let url of endpoints) {
+            if (success) break;
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + q }] }] })
+                });
+                const data = await response.json();
+                if (data.candidates) {
+                    m.innerText = data.candidates[0].content.parts[0].text;
+                    success = true;
+                }
+            } catch (err) { console.warn("Versuch fehlgeschlagen mit: " + url); }
+        }
+
+        if (!success) m.innerText = "Leider kein Modell-Zugriff. Bitte prüfe die API-Aktivierung im AI Studio.";
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // CHIPS ANKLICKBAR MACHEN
+    // Chips anklickbar machen
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.onclick = () => ask(chip.innerText);
     });
 
-    btn.onclick = () => ask(input.value);
+    document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
 
