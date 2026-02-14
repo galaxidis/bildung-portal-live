@@ -2,6 +2,8 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
+    if (!container) return;
+
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
@@ -11,8 +13,10 @@ async function fetchPosts() {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
+            // Kachel erstellen
             const card = document.createElement('div');
-            card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col';
+            card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
+            
             card.innerHTML = `
                 <img src="${media}" class="h-44 w-full object-cover">
                 <div class="p-5 flex flex-col flex-grow">
@@ -23,12 +27,27 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
-            card.querySelector('.js-details').onclick = () => openContent(post.id, false);
-            if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            // WICHTIG: Die Klicks werden genau hier an die Buttons gebunden
+            const detailsBtn = card.querySelector('.js-details');
+            detailsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openContent(post.id, false);
+            });
+
+            if (hasH5P) {
+                const startBtn = card.querySelector('.js-start');
+                startBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openContent(post.id, true);
+                });
+            }
 
             container.appendChild(card);
         });
-    } catch (e) { container.innerHTML = "Fehler beim Laden."; }
+    } catch (e) {
+        console.error("Ladefehler:", e);
+        container.innerHTML = "<p class='text-center py-10 col-span-full text-red-500'>Inhalte konnten nicht geladen werden.</p>";
+    }
 }
 
 async function openContent(postId, directH5P) {
@@ -36,9 +55,11 @@ async function openContent(postId, directH5P) {
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    // 1. Erst Modal zeigen, dann laden
+    if (!modal) return;
+
+    // Fenster sichtbar machen
     modal.classList.remove('hidden');
-    body.innerHTML = '<p class="text-center py-10">Lade Inhalt...</p>';
+    body.innerHTML = '<div class="text-center py-20"><div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#00aaff] border-r-transparent"></div><p class="mt-2 text-slate-500">Lade Übung...</p></div>';
     footer.innerHTML = "";
 
     try {
@@ -53,29 +74,46 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `<div class="aspect-video"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full rounded-xl" allowfullscreen></iframe></div>`;
+            body.innerHTML = `
+                <div class="aspect-video w-full rounded-2xl overflow-hidden shadow-lg bg-black">
+                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
+                    class="w-full h-full border-0" allowfullscreen></iframe>
+                </div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold text-[#003366] mb-4">${post.title.rendered}</h2><div class="text-slate-600">${post.content.rendered}</div>`;
+            body.innerHTML = `
+                <h2 class="text-2xl font-extrabold text-[#003366] mb-4">${post.title.rendered}</h2>
+                <div class="prose prose-slate max-w-none text-slate-600 text-lg">
+                    ${post.content.rendered}
+                </div>`;
+            
             if (h5pId) {
-                const b = document.createElement('button');
-                b.className = "px-8 py-3 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer";
-                b.innerText = "🚀 Jetzt Übung starten";
-                b.onclick = () => openContent(post.id, true);
-                footer.appendChild(b);
+                const btn = document.createElement('button');
+                btn.className = "px-10 py-3 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer hover:bg-[#16a34a] shadow-lg transition-all";
+                btn.innerText = "🚀 Jetzt Übung starten";
+                btn.onclick = () => openContent(post.id, true);
+                footer.appendChild(btn);
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) {
+        body.innerHTML = "<p class='text-center text-red-500'>Fehler beim Laden des Beitrags.</p>";
+    }
 }
 
-// Schließen-Logik
-document.getElementById('closeModal').onclick = () => document.getElementById('contentModal').classList.add('hidden');
+// Schließen-Button
+document.getElementById('closeModal').onclick = () => {
+    document.getElementById('contentModal').classList.add('hidden');
+    // Stoppt das Video/H5P beim Schließen
+    document.getElementById('modalTextContent').innerHTML = "";
+};
 
 // Suche
 document.getElementById('searchInput').oninput = (e) => {
     const val = e.target.value.toLowerCase();
     document.querySelectorAll('#posts-container > div').forEach(el => {
-        el.style.display = el.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+        const title = el.querySelector('h5').innerText.toLowerCase();
+        el.style.display = title.includes(val) ? 'flex' : 'none';
     });
 };
 
+// Start
 document.addEventListener('DOMContentLoaded', fetchPosts);
