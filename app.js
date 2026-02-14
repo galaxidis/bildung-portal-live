@@ -3,29 +3,18 @@ const KEY_URL = 'https://hub.bildungdigital.at/key.txt';
 let GEMINI_API_KEY = "";
 
 /**
- * 1. KEY LADEN (Mit Fehler-Diagnose)
+ * 1. KEY LADEN
  */
 async function loadApiKey() {
-    console.log("🔍 Versuche Key zu laden von:", KEY_URL);
+    console.log("🔍 Lade Key von:", KEY_URL);
     try {
         const response = await fetch(KEY_URL);
-        
-        if (!response.ok) {
-            throw new Error(`Server antwortet mit Status ${response.status}. Datei evtl. nicht vorhanden.`);
-        }
-        
+        if (!response.ok) throw new Error(`Server-Status: ${response.status}`);
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
-
-        if (GEMINI_API_KEY.length > 10) {
-            console.log("✅ Key erfolgreich geladen! (Länge: " + GEMINI_API_KEY.length + ")");
-        } else {
-            console.error("⚠️ Key in der Datei ist zu kurz oder leer!");
-        }
+        console.log("✅ Key bereit.");
     } catch (e) {
-        console.error("❌ Kritischer Fehler beim Key-Laden:", e.message);
-        // Kleiner visueller Hinweis für dich in der Konsole
-        console.log("HINWEIS: Prüfe, ob https://hub.bildungdigital.at/key.txt im Browser aufrufbar ist.");
+        console.error("❌ Key-Ladefehler (CORS prüfen!):", e.message);
     }
 }
 
@@ -87,7 +76,7 @@ function performSearch() {
 }
 
 /**
- * 4. CHAT-BOT (Der Herzschlag)
+ * 4. CHAT-BOT (STABILE VERSION v1)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -99,12 +88,18 @@ function initChat() {
     chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
+    // Fix für die Vorschläge (Chips)
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.addEventListener('click', () => { 
+            const question = chip.innerText;
+            chatInput.value = question;
+            askGemini(question); 
+        });
+    });
+
     async function askGemini(question) {
         if (!GEMINI_API_KEY) {
-            const errorMsg = document.createElement('div');
-            errorMsg.className = "text-red-500 text-[10px] mb-2";
-            errorMsg.innerText = "⚠️ System-Fehler: Key konnte nicht vom Server geladen werden. Bitte F12-Konsole prüfen!";
-            msgArea.appendChild(errorMsg);
+            alert("KI-Key fehlt. Bitte prüfe die Konsole (F12).");
             return;
         }
 
@@ -122,25 +117,26 @@ function initChat() {
         const loadingMsg = addMsg("KI überlegt...");
 
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // Umstellung auf v1 für bessere Kompatibilität
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz und hilfsbereit auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte als hilfreicher Assistent kurz auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                console.error("Google API Fehler:", data);
-                loadingMsg.innerHTML = `<span class="text-red-500">Google-Fehler: ${data.error?.message || 'Zugriff verweigert'}</span>`;
+                console.error("Google Fehler:", data);
+                loadingMsg.innerHTML = `<span class="text-red-500">Fehler: ${data.error?.message || 'Zugriff verweigert'}</span>`;
                 return;
             }
 
             loadingMsg.innerText = data.candidates[0].content.parts[0].text;
         } catch (err) {
-            loadingMsg.innerText = "Verbindung zu Google fehlgeschlagen.";
+            loadingMsg.innerText = "Netzwerk-Fehler.";
         }
     }
 
@@ -152,9 +148,9 @@ function initChat() {
  * START
  */
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadApiKey(); // 1. Key laden
-    fetchPosts();       // 2. Posts laden
-    initChat();         // 3. Chat bereitmachen
+    await loadApiKey();
+    fetchPosts();
+    initChat();
     
     document.getElementById('searchInput')?.addEventListener('input', performSearch);
     document.getElementById('closeModal')?.addEventListener('click', () => {
