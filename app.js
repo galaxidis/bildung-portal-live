@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-// 1. MODAL & H5P (FIXIERT)
+// 1. MODAL-STEUERUNG
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -10,6 +10,7 @@ function closeModal() {
     }
 }
 
+// 2. KACHELN & H5P (UNBERÜHRBAR FIXIERT)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -47,7 +48,7 @@ async function openContent(postId, directH5P) {
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = 'Lade...';
+    body.innerHTML = '<div class="p-10 text-center">Inhalt wird geladen...</div>';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -59,12 +60,12 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) { body.innerHTML = "Ladefehler."; }
 }
 
-// 4. CHAT-BOT (MIT CHIP-KORREKTUR)
+// 3. CHAT-BOT (DER ULTIMATIVE MODELL-FIX)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -77,46 +78,55 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "Frage wird gesendet...";
+        m.innerText = "Antwort wird generiert...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
-        try {
-            // HINWEIS: Falls Google blockiert, hier eine Proxy-URL oder einen anderen Anbieter nutzen
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // Wir probieren zwei Pfade nacheinander (Fallback-Strategie)
+        const tryModel = async (modelName) => {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: q }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + q }] }] })
             });
-            const data = await response.json();
-            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Google blockiert den Zugriff (Region/CORS).";
+            return await response.json();
+        };
+
+        try {
+            let data = await tryModel("gemini-1.5-flash");
+            
+            // Falls Fehler "Not Found", probiere gemini-pro
+            if (data.error && data.error.status === "NOT_FOUND") {
+                data = await tryModel("gemini-pro");
+            }
+
+            if (data.candidates && data.candidates[0].content) {
+                m.innerText = data.candidates[0].content.parts[0].text;
+            } else {
+                m.innerText = "Fehler: " + (data.error?.message || "Modell nicht erreichbar.");
+            }
         } catch (err) { m.innerText = "Netzwerkfehler."; }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // CHIPS ANKLICKBAR MACHEN
-    function bindChips() {
-        const chips = document.querySelectorAll('.chat-chip');
-        chips.forEach(chip => {
-            chip.style.cursor = "pointer";
-            chip.onclick = (e) => {
-                e.preventDefault();
-                ask(chip.innerText);
-            };
-        });
-    }
-
-    // Da Chips oft dynamisch sind, binden wir sie beim Start
-    bindChips();
+    // CHIPS - JETZT ANKLICKBAR
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.style.cursor = "pointer";
+        chip.onclick = (e) => {
+            e.preventDefault();
+            ask(chip.innerText);
+        };
+    });
 
     document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
 
+// 4. INITIALISIERUNG
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    const c = document.getElementById('closeModal');
-    if (c) c.onclick = closeModal;
+    const closeBtn = document.getElementById('closeModal');
+    if (closeBtn) closeBtn.onclick = closeModal;
 });
