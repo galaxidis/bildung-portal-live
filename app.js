@@ -1,14 +1,12 @@
 /**
- * HUB BILDUNG DIGITAL - MASTER APP SCRIPT
- * Integration: WordPress REST API, H5P Embed & Groq AI Chat
- * Fix: Model Deprecation Llama 3 -> Llama 3.1
+ * HUB BILDUNG DIGITAL - FIREFOX COMPATIBLE VERSION
  */
 
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const AI_API_KEY = "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"; 
-const AI_MODEL = "llama-3.1-8b-instant"; // Das aktuelle, unterstützte Modell
+const AI_MODEL = "llama-3.1-8b-instant"; 
 
-// 1. MODAL-STEUERUNG
+// 1. MODAL STEUERUNG
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -17,12 +15,17 @@ function closeModal() {
     }
 }
 
-// 2. KACHELN LADEN
+// 2. KACHELN LADEN (FIREFOX FIX: Header + Mode)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
     try {
-        const res = await fetch(API_URL);
+        const res = await fetch(API_URL, {
+            mode: 'cors', // Firefox braucht das explizit
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
         const posts = await res.json();
         container.innerHTML = ""; 
         
@@ -35,7 +38,7 @@ async function fetchPosts() {
             col.innerHTML = `
                 <div class="hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full">
                     <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
-                        <img src="${media}" class="w-full h-full object-cover" alt="${post.title.rendered}">
+                        <img src="${media}" class="w-full h-full object-cover">
                     </div>
                     <div class="p-5 flex flex-col flex-grow">
                         <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
@@ -51,21 +54,21 @@ async function fetchPosts() {
             container.appendChild(col);
         });
     } catch (e) {
-        console.error("WordPress API Error:", e);
+        console.error("WP-Fehler:", e);
     }
 }
 
-// 3. MODAL INHALT
+// 3. INHALT LADEN
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="p-10 text-center italic">Lade Lerninhalt...</div>';
+    body.innerHTML = 'Laden...';
     
     try {
-        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
+        const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`, { mode: 'cors' });
         const post = await res.json();
         
         let h5pId = null;
@@ -75,25 +78,16 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `
-                <div class="w-full h-[75vh]">
-                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                            class="w-full h-full border-0" 
-                            allowfullscreen></iframe>
-                </div>`;
+            body.innerHTML = `<div class="w-full h-[75vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `
-                <h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2>
-                <div class="prose max-w-none text-slate-700 font-sans">
-                    ${post.content.rendered}
-                </div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
     } catch (e) {
-        body.innerHTML = `<div class="p-10 text-red-500">Fehler beim Laden.</div>`;
+        body.innerHTML = "Fehler beim Laden.";
     }
 }
 
-// 4. KI CHAT-BOT (Groq Llama 3.1)
+// 4. KI CHAT-BOT (FIREFOX FIX: Credentials & Origin)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -105,22 +99,17 @@ function initChat() {
     async function askAI(question) {
         if (!question || !question.trim()) return;
         
-        const userMsg = document.createElement('div');
-        userMsg.className = "bg-slate-100 p-2 rounded-lg mb-2 text-xs text-slate-600 self-end ml-auto max-w-[80%]";
-        userMsg.innerText = question;
-        msgs.appendChild(userMsg);
-
-        const aiMsg = document.createElement('div');
-        aiMsg.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        aiMsg.innerText = "KI schreibt...";
-        msgs.appendChild(aiMsg);
-        
+        const m = document.createElement('div');
+        m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
+        m.innerText = "Verbindung wird hergestellt...";
+        msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
+                mode: 'cors', // Zwingend für Firefox
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": "Bearer " + AI_API_KEY.trim()
@@ -128,25 +117,22 @@ function initChat() {
                 body: JSON.stringify({
                     model: AI_MODEL,
                     messages: [
-                        { role: "system", content: "Du bist ein hilfreicher Lern-Assistent. Antworte kurz und knackig auf Deutsch." },
+                        { role: "system", content: "Antworte kurz auf Deutsch." },
                         { role: "user", content: question }
                     ]
                 })
             });
 
             const data = await response.json();
-            if (data.choices && data.choices[0]) {
-                aiMsg.innerText = data.choices[0].message.content;
-            } else {
-                aiMsg.innerText = "Fehler: " + (data.error?.message || "Unbekanntes Problem.");
-            }
+            m.innerText = data.choices[0].message.content;
         } catch (err) {
-            aiMsg.innerText = "Verbindung zu Groq unterbrochen.";
+            m.innerText = "Firefox blockiert die Verbindung. Bitte Seite neu laden.";
+            console.error("FF-Error:", err);
         }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // Chip-Klicks abfangen
+    // Event Delegation für Chips
     document.addEventListener('click', function (e) {
         if (e.target && e.target.classList.contains('chat-chip')) {
             askAI(e.target.innerText);
@@ -157,11 +143,9 @@ function initChat() {
     input.onkeypress = (e) => { if (e.key === 'Enter') askAI(input.value); };
 }
 
-// 5. START
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    if (document.getElementById('closeModal')) {
-        document.getElementById('closeModal').onclick = closeModal;
-    }
+    const cb = document.getElementById('closeModal');
+    if (cb) cb.onclick = closeModal;
 });
