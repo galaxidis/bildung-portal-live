@@ -1,8 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
-// Dein Groq-Key ist jetzt eingebaut!
 const AI_API_KEY = "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"; 
 
-// 1. MODAL & H5P STEUERUNG
+// 1. MODAL & H5P (Bleibt stabil)
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -11,7 +10,6 @@ function closeModal() {
     }
 }
 
-// 2. KACHELN LADEN (WP REST API)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -41,17 +39,15 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler beim Laden der Kacheln"); }
+    } catch (e) { console.error("Kacheln konnten nicht geladen werden."); }
 }
 
-// 3. INHALT ÖFFNEN (H5P IFRAME ODER TEXT)
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="p-10 text-center italic">Wird geladen...</div>';
-    
+    body.innerHTML = 'Lade...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -60,16 +56,15 @@ async function openContent(postId, directH5P) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
-
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden des Inhalts."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (GROQ-ENGINE & CHIP-FIX)
+// 4. CHAT-BOT (MIT DETAILLIERTER FEHLERANALYSE)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -82,7 +77,7 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "KI schreibt...";
+        m.innerText = "Verbindung wird geprüft...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
@@ -91,34 +86,41 @@ function initChat() {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${AI_API_KEY}`
+                    "Authorization": `Bearer ${AI_API_KEY}`,
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
                     model: "llama3-8b-8192",
-                    messages: [{ role: "user", content: "Antworte sehr kurz auf Deutsch: " + q }]
+                    messages: [{ role: "user", content: "Antworte kurz: " + q }]
                 })
             });
 
-            const data = await response.json();
-            m.innerText = data.choices[0].message.content;
+            if (!response.ok) {
+                const errorBody = await response.json();
+                m.innerText = "Groq Fehler: " + (errorBody.error?.message || response.statusText);
+            } else {
+                const data = await response.json();
+                m.innerText = data.choices[0].message.content;
+            }
         } catch (err) { 
-            m.innerText = "Fehler: Verbindung zu Groq fehlgeschlagen."; 
+            m.innerText = "Netzwerk-Block: Dein Browser oder Router lässt die Anfrage nicht zu. (CORS/Inkognito)";
+            console.error(err);
         }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // Chips (Vorschläge) anklickbar machen
+    // Chips (Vorschläge)
     document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.style.cursor = "pointer";
-        chip.onclick = () => ask(chip.innerText);
+        chip.onclick = (e) => {
+            e.preventDefault();
+            ask(chip.innerText);
+        };
     });
 
     document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
 
-// 5. START
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
