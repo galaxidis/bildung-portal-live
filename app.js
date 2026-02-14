@@ -2,7 +2,6 @@ const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&
 
 /**
  * 1. BEITRÄGE LADEN
- * Holt die Daten von WordPress und erstellt die Kacheln.
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -18,9 +17,8 @@ async function fetchPosts() {
             const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
-            // Grid-Spalte erstellen
             const col = document.createElement('div');
-            col.className = 'w-full'; // Tailwind Grid übernimmt das Layout
+            col.className = 'w-full'; 
 
             const card = document.createElement('div');
             card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
@@ -37,7 +35,6 @@ async function fetchPosts() {
                     </div>
                 </div>`;
             
-            // Events binden
             card.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) card.querySelector('.js-start').onclick = () => openContent(post.id, true);
             
@@ -51,8 +48,7 @@ async function fetchPosts() {
 }
 
 /**
- * 2. SUCHE
- * Filtert die Kacheln und zeigt eine Meldung, wenn nichts gefunden wurde.
+ * 2. SUCHE MIT NEGATIV-MELDUNG
  */
 function performSearch() {
     const sInput = document.getElementById('searchInput');
@@ -64,7 +60,6 @@ function performSearch() {
 
     cards.forEach(card => {
         const title = card.querySelector('h5').innerText.toLowerCase();
-        // Wir blenden das Elternelement (die Grid-Spalte) ein/aus
         if (title.includes(term)) {
             card.parentElement.style.display = 'block';
             visibleCount++;
@@ -82,7 +77,7 @@ function performSearch() {
         msg.className = 'col-span-full text-center py-12 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200';
         msg.innerHTML = `
             <h3 class="text-xl font-bold text-[#003366]">Nichts gefunden für "${term}"</h3>
-            <button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle Inhalte anzeigen</button>
+            <button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle Inhalte zeigen</button>
         `;
         container.appendChild(msg);
     }
@@ -90,7 +85,7 @@ function performSearch() {
 
 /**
  * 3. MODAL (INHALT ÖFFNEN)
- * Mit dem "Reiniger-Fix" für H5P (schneidet Kopf- und Fußzeilen weg).
+ * Mit clip-path Fix gegen den weißen Bereich und H5P-Zusatzinhalte.
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
@@ -115,18 +110,19 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            // H5P-MODUS mit "Clipping": Schneidet oben 45px und unten den Rest ab
+            // SMART-CLIP FIX:
+            // Schneidet exakt die untersten 60px ab, um Menüs zu verstecken.
+            // Padding-bottom sorgt für das 16:9 Verhältnis.
             body.innerHTML = `
-                <div style="position: relative; width: 100%; padding-bottom: 56.25%; overflow: hidden; border-radius: 1.5rem; background: #fff; box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);">
+                <div style="position: relative; width: 100%; padding-bottom: 56.25%; overflow: hidden; border-radius: 1.5rem; background: #ffffff;">
                     <iframe 
                         src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
-                        style="position: absolute; top: -45px; left: 0; width: 100%; height: calc(100% + 90px); border: 0;" 
+                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; clip-path: inset(0 0 60px 0);" 
                         allowfullscreen 
                         scrolling="no">
                     </iframe>
                 </div>`;
         } else {
-            // NORMALER TEXT-MODUS
             body.innerHTML = `
                 <h2 class="text-3xl font-extrabold text-[#003366] mb-6 leading-tight">${post.title.rendered}</h2>
                 <div class="prose prose-slate max-w-none text-lg text-slate-600">
@@ -142,12 +138,12 @@ async function openContent(postId, directH5P) {
             }
         }
     } catch (e) {
-        body.innerHTML = "<p class='text-center text-red-500'>Inhalt konnte nicht geladen werden.</p>";
+        body.innerHTML = "<p class='text-center text-red-500'>Fehler beim Laden.</p>";
     }
 }
 
 /**
- * 4. START-EVENTS
+ * 4. INITIALISIERUNG
  */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
@@ -158,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sInput) sInput.oninput = performSearch;
     if (sBtn) sBtn.onclick = performSearch;
     
-    // Modal Schließen
     const closeBtn = document.getElementById('closeModal');
     if (closeBtn) {
         closeBtn.onclick = () => {
