@@ -117,3 +117,29 @@ document.getElementById('searchInput').oninput = (e) => {
 
 // Start
 document.addEventListener('DOMContentLoaded', fetchPosts);
+// Funktion für die Suche (damit wir sie an zwei Stellen nutzen können)
+function performSearch() {
+    const term = document.getElementById('searchInput').value.toLowerCase();
+    document.querySelectorAll('#posts-container > div').forEach(el => {
+        const title = el.querySelector('h5').innerText.toLowerCase();
+        el.style.display = title.includes(term) ? 'flex' : 'none';
+    });
+}
+
+// 1. Suche beim Tippen (wie bisher)
+document.getElementById('searchInput').oninput = performSearch;
+
+// 2. Suche beim Klick auf den GO-Button
+document.getElementById('searchButton').onclick = (e) => {
+    e.preventDefault();
+    performSearch();
+};
+
+// 3. Suche beim Drücken der ENTER-Taste
+document.getElementById('searchInput').onkeydown = (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        performSearch();
+    }
+};
+
