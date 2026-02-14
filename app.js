@@ -1,20 +1,13 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-/**
- * 1. MODAL-STEUERUNG (BOMBENFEST)
- */
+// 1. MODAL-STEUERUNG (Global erreichbar)
 function closeModal() {
     const modal = document.getElementById('contentModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        document.getElementById('modalTextContent').innerHTML = ""; 
-    }
+    if (modal) modal.classList.add('hidden');
 }
 
-/**
- * 2. BEITRÄGE LADEN (DIE KACHELN)
- */
+// 2. BEITRÄGE LADEN (Isoliert)
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -44,12 +37,10 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Kachel-Fehler:", e); }
+    } catch (e) { console.error("Kacheln:", e); }
 }
 
-/**
- * 3. INHALT ÖFFNEN
- */
+// 3. INHALT ÖFFNEN
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
@@ -59,77 +50,51 @@ async function openContent(postId, directH5P) {
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        let h5pId = null;
-        if (post._embedded?.['wp:term']?.[1]) {
-            const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
-            if (idTag) h5pId = idTag.name.trim();
-        }
-        if (directH5P && h5pId) {
-            body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
-        } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none font-sans">${post.content.rendered}</div>`;
-        }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+        body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-/**
- * 4. CHAT-BOT (V1 MIT GEMINI-PRO)
- */
+// 4. CHAT-BOT (Mit Try-Catch für JEDE Aktion)
 function initChat() {
-    const chatToggle = document.getElementById('chat-toggle');
-    const chatWindow = document.getElementById('chat-window');
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('send-chat');
-    const msgArea = document.getElementById('chat-messages');
+    const toggle = document.getElementById('chat-toggle');
+    const win = document.getElementById('chat-window');
+    const input = document.getElementById('chat-input');
+    const btn = document.getElementById('send-chat');
+    const msgs = document.getElementById('chat-messages');
 
-    chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
-    document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
+    if (!toggle || !win) return;
 
-    async function askGemini(question) {
-        const addMsg = (text, isBot = true) => {
-            const m = document.createElement('div');
-            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto mb-2 text-xs text-right";
-            m.innerText = text;
-            msgArea.appendChild(m);
-            msgArea.scrollTop = msgArea.scrollHeight;
-            return m;
-        };
+    toggle.onclick = () => win.classList.toggle('hidden');
+    document.getElementById('close-chat').onclick = () => win.classList.add('hidden');
 
-        addMsg(question, false);
-        chatInput.value = "";
-        const loadingMsg = addMsg("KI schreibt...");
+    async function ask(q) {
+        const m = document.createElement('div');
+        m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs";
+        m.innerText = "KI denkt nach...";
+        msgs.appendChild(m);
+        input.value = "";
 
         try {
-            // Wir nutzen hier /v1/ und gemini-pro - das ist der stabilste Pfad für AI Studio Keys
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+            // Wir nutzen jetzt v1beta und das Modell 'gemini-1.5-flash' - das MUSS der Key können!
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: q }] }] })
             });
-
-            const data = await response.json();
-            if (data.candidates && data.candidates[0].content.parts[0].text) {
-                loadingMsg.innerText = data.candidates[0].content.parts[0].text;
-            } else {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Modell nicht erreichbar.");
-            }
-        } catch (err) { loadingMsg.innerText = "Verbindung fehlgeschlagen."; }
+            const d = await r.json();
+            m.innerText = d.candidates?.[0]?.content?.parts?.[0]?.text || "Fehler: " + JSON.stringify(d.error);
+        } catch (err) {
+            m.innerText = "Verbindung fehlgeschlagen.";
+        }
     }
 
-    sendBtn?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
-    chatInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    btn.onclick = () => { if(input.value.trim()) ask(input.value.trim()); };
 }
 
-/**
- * 5. INITIALISIERUNG
- */
+// 5. START
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    
-    // Der Button im HTML muss id="closeModal" haben
-    const closeBtn = document.getElementById('closeModal');
-    if (closeBtn) {
-        closeBtn.onclick = closeModal;
-    }
+    const c = document.getElementById('closeModal');
+    if (c) c.onclick = closeModal;
 });
