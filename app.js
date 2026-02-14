@@ -7,65 +7,44 @@ async function fetchPosts() {
     try {
         const res = await fetch(API_URL);
         const posts = await res.json();
-        container.innerHTML = ""; 
+        
+        container.innerHTML = ""; // Alten Inhalt/Spinner löschen
 
         posts.forEach(post => {
-            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://images.unsplash.com/photo-1510070112810-d4e9a46d9e91?w=600';
+            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || 'https://via.placeholder.com/600x400';
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             
-            // Kachel-Container
+            // Grid-Spalte
             const col = document.createElement('div');
-            col.className = 'col-md-4 col-sm-6 post-card-container';
+            col.className = 'col-12 col-sm-6 col-lg-4 post-card-container';
             
-            // Karte erstellen
-            const card = document.createElement('div');
-            card.className = 'card';
+            // Die Kachel (Card)
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm">
+                    <div class="img-box">
+                        <img src="${media}" alt="Vorschau">
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title fw-bold" style="color: #003366; min-height: 3rem;">
+                            ${post.title.rendered.replace(/&nbsp;/g, ' ')}
+                        </h5>
+                        <div class="mt-auto d-grid gap-2 d-flex">
+                            <button class="btn btn-outline-primary btn-pill flex-fill js-details">Details</button>
+                            ${hasH5P ? `<button class="btn btn-success btn-pill flex-fill js-start">🚀 Start</button>` : ''}
+                        </div>
+                    </div>
+                </div>`;
             
-            // Bild-Box
-            const imgBox = document.createElement('div');
-            imgBox.className = 'img-box';
-            const img = document.createElement('img');
-            img.src = media;
-            img.className = 'card-img-top';
-            imgBox.appendChild(img);
-            
-            // Body
-            const body = document.createElement('div');
-            body.className = 'card-body';
-            const title = document.createElement('h5');
-            title.className = 'fw-bold mb-4';
-            title.style.color = '#003366';
-            title.textContent = post.title.rendered.replace(/&nbsp;/g, ' ');
-            
-            const btnGroup = document.createElement('div');
-            btnGroup.className = 'd-flex';
-
-            // Details Button
-            const dBtn = document.createElement('button');
-            dBtn.className = 'btn-pill btn-details flex-fill';
-            dBtn.textContent = 'Details';
-            dBtn.addEventListener('click', () => openContent(post.id, false));
-
-            btnGroup.appendChild(dBtn);
-
-            // Start Button
+            // Event Listener hinzufügen (Sicher vor CSP)
+            col.querySelector('.js-details').addEventListener('click', () => openContent(post.id, false));
             if (hasH5P) {
-                const sBtn = document.createElement('button');
-                sBtn.className = 'btn-pill btn-start flex-fill';
-                sBtn.textContent = '🚀 Start';
-                sBtn.addEventListener('click', () => openContent(post.id, true));
-                btnGroup.appendChild(sBtn);
+                col.querySelector('.js-start').addEventListener('click', () => openContent(post.id, true));
             }
 
-            body.appendChild(title);
-            body.appendChild(btnGroup);
-            card.appendChild(imgBox);
-            card.appendChild(body);
-            col.appendChild(card);
             container.appendChild(col);
         });
     } catch (e) {
-        container.innerHTML = "Fehler beim Laden.";
+        container.innerHTML = `<div class="alert alert-warning">Inhalte konnten nicht geladen werden.</div>`;
     }
 }
 
@@ -75,7 +54,7 @@ async function openContent(postId, directH5P) {
     const body = document.getElementById('modalTextContent');
     const footer = document.getElementById('modalFooter');
     
-    body.innerHTML = 'Lädt...';
+    body.innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>';
     footer.innerHTML = "";
     bModal.show();
 
@@ -91,25 +70,32 @@ async function openContent(postId, directH5P) {
         }
 
         if (directH5P && h5pId) {
-            body.innerHTML = `<div class="ratio ratio-16x9"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" allowfullscreen style="border:none; border-radius:15px;"></iframe></div>`;
+            body.innerHTML = `
+                <div class="ratio ratio-16x9">
+                    <iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" 
+                    allowfullscreen style="border-radius: 15px;"></iframe>
+                </div>`;
         } else {
             body.innerHTML = `<h2 class="fw-bold mb-3">${post.title.rendered}</h2><hr>${post.content.rendered}`;
             if (h5pId) {
-                const fBtn = document.createElement('button');
-                fBtn.className = "btn-pill btn-start px-5 py-3";
-                fBtn.textContent = "🚀 Jetzt Übung starten";
-                fBtn.addEventListener('click', () => openContent(post.id, true));
-                footer.appendChild(fBtn);
+                const sBtn = document.createElement('button');
+                sBtn.className = "btn btn-success btn-pill px-5 py-2";
+                sBtn.innerText = "🚀 Übung jetzt starten";
+                sBtn.addEventListener('click', () => openContent(post.id, true));
+                footer.appendChild(sBtn);
             }
         }
-    } catch (e) { body.innerHTML = "Fehler."; }
+    } catch (e) {
+        body.innerHTML = "Fehler beim Laden.";
+    }
 }
 
-document.addEventListener('DOMContentLoaded', fetchPosts);
-
+// Suche
 document.getElementById('searchInput')?.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('.post-card-container').forEach(el => {
         el.style.display = el.innerText.toLowerCase().includes(term) ? 'block' : 'none';
     });
 });
+
+document.addEventListener('DOMContentLoaded', fetchPosts);
