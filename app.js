@@ -3,18 +3,17 @@ const KEY_URL = 'https://hub.bildungdigital.at/key.txt';
 let GEMINI_API_KEY = "";
 
 /**
- * 1. KEY VOM SERVER LADEN
+ * 1. KEY LADEN
  */
 async function loadApiKey() {
-    console.log("🔍 Detektiv: Lade Key von", KEY_URL);
     try {
         const response = await fetch(KEY_URL);
-        if (!response.ok) throw new Error(`Server-Fehler: ${response.status}`);
+        if (!response.ok) throw new Error(`Server-Status: ${response.status}`);
         const text = await response.text();
         GEMINI_API_KEY = text.trim();
-        console.log("✅ Key erfolgreich empfangen.");
+        console.log("✅ Key geladen.");
     } catch (e) {
-        console.error("❌ Fehler beim Key-Laden:", e.message);
+        console.error("❌ Key-Fehler:", e.message);
     }
 }
 
@@ -63,7 +62,7 @@ async function openContent(postId, directH5P) {
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
-        body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
+        body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
     } catch (e) { body.innerHTML = "Fehler beim Laden."; }
 }
 
@@ -76,7 +75,7 @@ function performSearch() {
 }
 
 /**
- * 4. CHAT-BOT (STABILE VERSION v1)
+ * 4. CHAT-BOT (FINALE ANPASSUNG)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
@@ -88,20 +87,16 @@ function initChat() {
     chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
-    // Fix für die Vorschläge (Chips)
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.addEventListener('click', () => { 
-            const question = chip.innerText;
-            chatInput.value = question;
-            askGemini(question); 
+            const q = chip.innerText;
+            chatInput.value = q;
+            askGemini(q); 
         });
     });
 
     async function askGemini(question) {
-        if (!GEMINI_API_KEY) {
-            alert("API-Key nicht geladen. Bitte prüfe die key.txt im Stammverzeichnis.");
-            return;
-        }
+        if (!GEMINI_API_KEY) return;
 
         const addMsg = (text, isBot = true) => {
             const m = document.createElement('div');
@@ -114,31 +109,39 @@ function initChat() {
 
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("KI denkt nach...");
+        const loadingMsg = addMsg("KI überlegt...");
 
         try {
-            // WICHTIG: Nutzt jetzt v1 und das stabilere gemini-1.5-pro
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
+            // Wir nutzen hier gemini-1.5-flash-8b (sehr stabil in v1)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz und präzise auf Deutsch: " + question }] }]
+                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
                 })
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                console.error("Detaillierter Google-Fehler:", data);
-                const reason = data.error?.message || "Unbekannter Fehler";
-                loadingMsg.innerHTML = `<span class="text-red-500">Google lehnt ab: ${reason}</span>`;
-                return;
+                // Wenn auch 8b nicht geht, probieren wir das Standard-Pro Modell
+                console.warn("Versuche Fallback-Modell...");
+                const retry = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: question }] }] })
+                });
+                const retryData = await retry.json();
+                if (retryData.candidates) {
+                    loadingMsg.innerText = retryData.candidates[0].content.parts[0].text;
+                    return;
+                }
+                throw new Error(data.error?.message || "Modell-Fehler");
             }
 
             loadingMsg.innerText = data.candidates[0].content.parts[0].text;
         } catch (err) {
-            console.error("Netzwerk-Fehler:", err);
-            loadingMsg.innerText = "Verbindung fehlgeschlagen.";
+            loadingMsg.innerHTML = `<span class="text-red-500">Google-Fehler: ${err.message}</span>`;
         }
     }
 
@@ -147,7 +150,7 @@ function initChat() {
 }
 
 /**
- * START-SEQUENZ
+ * START
  */
 document.addEventListener('DOMContentLoaded', async () => {
     await loadApiKey();
