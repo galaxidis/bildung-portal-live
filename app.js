@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
 /**
- * 1. BEITRÄGE LADEN & BILDER
+ * 1. BEITRÄGE LADEN & BILDER-FIX
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -13,20 +13,20 @@ async function fetchPosts() {
         container.innerHTML = ""; 
 
         posts.forEach((post, index) => {
-            // Stabile Dummy-Bilder von Unsplash
-            const imageIds = ['1485856407642-7f9ba0f2085c', '1454165833267-0e1e9c43fbb3', '1519389950473-47ba0277781c', '1501504905953-f841e0ad064c', '1498050108023-c5249f4df085', '1550745165-9bc0b252726f'];
-            const imageId = imageIds[index % imageIds.length];
-            const fallbackImage = `https://images.unsplash.com/photo-${imageId}?auto=format&fit=crop&q=80&w=600&h=400`;
-            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || fallbackImage;
+            // ROBUSTE BILD-LOGIK: Wir nutzen Picsum, das ist für Dummys oft stabiler als Unsplash
+            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url 
+                          || `https://picsum.photos/seed/${post.id}/600/400`;
 
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
             const col = document.createElement('div');
             col.className = 'w-full'; 
             
             const card = document.createElement('div');
-            card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full cursor-default';
+            card.className = 'hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full';
             card.innerHTML = `
-                <div class="h-44 overflow-hidden bg-slate-100"><img src="${media}" class="w-full h-full object-cover"></div>
+                <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
+                    <img src="${media}" class="w-full h-full object-cover">
+                </div>
                 <div class="p-5 flex flex-col flex-grow">
                     <h5 class="text-lg font-bold text-[#003366] mb-4 leading-tight">${post.title.rendered}</h5>
                     <div class="flex gap-2 mt-auto">
@@ -48,10 +48,8 @@ async function fetchPosts() {
  * 2. SUCHE
  */
 function performSearch() {
-    const sInput = document.getElementById('searchInput');
-    const term = sInput ? sInput.value.toLowerCase().trim() : "";
-    const container = document.getElementById('posts-container');
-    const cards = container.querySelectorAll('.hover-card');
+    const term = document.getElementById('searchInput')?.value.toLowerCase().trim() || "";
+    const cards = document.querySelectorAll('.hover-card');
     let visibleCount = 0;
 
     cards.forEach(card => {
@@ -67,21 +65,19 @@ function performSearch() {
         const msg = document.createElement('div');
         msg.id = 'no-results-msg';
         msg.className = 'col-span-full text-center py-12 bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-200';
-        msg.innerHTML = `<h3 class="text-xl font-bold text-[#003366]">Nichts gefunden für "${term}"</h3><button onclick="document.getElementById('searchInput').value=''; performSearch();" class="mt-4 text-[#00aaff] font-bold underline cursor-pointer">Alle anzeigen</button>`;
-        container.appendChild(msg);
+        msg.innerHTML = `<h3 class="text-xl font-bold text-[#003366]">Nichts gefunden</h3>`;
+        document.getElementById('posts-container').appendChild(msg);
     }
 }
 
 /**
- * 3. MODAL (DETAILS / H5P)
+ * 3. MODAL (INHALT)
  */
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
-    const footer = document.getElementById('modalFooter');
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center py-20">Lädt...</div>';
-    footer.innerHTML = "";
+    body.innerHTML = 'Laden...';
 
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
@@ -96,68 +92,66 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full bg-white rounded-2xl overflow-hidden" style="height: 65vh;"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-3xl font-extrabold text-[#003366] mb-6">${post.title.rendered}</h2><div class="prose max-w-none text-lg text-slate-600">${post.content.rendered}</div>`;
-            if (h5pId) {
-                const btn = document.createElement('button');
-                btn.className = "px-10 py-4 bg-[#22c55e] text-white font-bold rounded-full cursor-pointer text-xl shadow-lg";
-                btn.innerText = "🚀 Übung jetzt starten";
-                btn.onclick = () => openContent(post.id, true);
-                footer.appendChild(btn);
-            }
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4">${post.title.rendered}</h2><div class="prose">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
 /**
- * 4. CHATBOT INITIALISIERUNG
+ * 4. CHAT-BOT LOGIK (FIXED)
  */
 function initChat() {
     const chatToggle = document.getElementById('chat-toggle');
     const chatWindow = document.getElementById('chat-window');
+    const closeChat = document.getElementById('close-chat');
     const chatInput = document.getElementById('chat-input');
-    const chatChips = document.querySelectorAll('.chat-chip');
     const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
-    if (chatToggle) chatToggle.onclick = () => chatWindow.classList.toggle('hidden');
-    if (document.getElementById('close-chat')) document.getElementById('close-chat').onclick = () => chatWindow.classList.add('hidden');
+    if (chatToggle && chatWindow) {
+        chatToggle.addEventListener('click', () => {
+            chatWindow.classList.toggle('hidden');
+        });
+    }
 
-    chatChips.forEach(chip => {
-        chip.onclick = () => {
-            chatInput.value = "Frage zu: " + chip.innerText;
-            chatInput.focus();
-        };
+    if (closeChat) {
+        closeChat.addEventListener('click', () => {
+            chatWindow.classList.add('hidden');
+        });
+    }
+
+    // Wortvorschläge
+    document.querySelectorAll('.chat-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chatInput.value = chip.innerText;
+        });
     });
 
-    sendBtn.onclick = () => {
-        const text = chatInput.value.trim();
-        if (!text) return;
-        const uMsg = document.createElement('div');
-        uMsg.className = "bg-[#00aaff] text-white p-3 rounded-2xl shadow-sm max-w-[85%] ml-auto text-right text-xs";
-        uMsg.innerText = text;
-        msgArea.appendChild(uMsg);
-        chatInput.value = "";
-        msgArea.scrollTop = msgArea.scrollHeight;
-        
-        setTimeout(() => {
-            const bMsg = document.createElement('div');
-            bMsg.className = "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs";
-            bMsg.innerText = "Sobald mein API-Key bereit ist, beantworte ich dir das!";
-            msgArea.appendChild(bMsg);
+    if (sendBtn) {
+        sendBtn.addEventListener('click', () => {
+            if (!chatInput.value) return;
+            const msg = document.createElement('div');
+            msg.className = "bg-[#00aaff] text-white p-2 rounded-xl ml-auto max-w-[80%] text-xs";
+            msg.innerText = chatInput.value;
+            msgArea.appendChild(msg);
+            chatInput.value = "";
             msgArea.scrollTop = msgArea.scrollHeight;
-        }, 1000);
-    };
+        });
+    }
 }
 
+// ALLES STARTEN
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    if (document.getElementById('searchInput')) document.getElementById('searchInput').oninput = performSearch;
-    if (document.getElementById('searchButton')) document.getElementById('searchButton').onclick = performSearch;
-    if (document.getElementById('closeModal')) {
-        document.getElementById('closeModal').onclick = () => {
-            document.getElementById('contentModal').classList.add('hidden');
-            document.getElementById('modalTextContent').innerHTML = "";
-        };
-    }
+    
+    // Suche binden
+    document.getElementById('searchInput')?.addEventListener('input', performSearch);
+    document.getElementById('searchButton')?.addEventListener('click', performSearch);
+    
+    // Modal schließen
+    document.getElementById('closeModal')?.addEventListener('click', () => {
+        document.getElementById('contentModal').classList.add('hidden');
+        document.getElementById('modalTextContent').innerHTML = "";
+    });
 });
