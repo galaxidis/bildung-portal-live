@@ -1,12 +1,10 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 
-// TRAGE HIER DEINEN KEY EIN (zwischen die Anführungszeichen)
-const MANUAL_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
-
-let GEMINI_API_KEY = MANUAL_KEY;
+// HIER DEINEN KEY EINTRAGEN
+const GEMINI_API_KEY = "AIzaSyBKBn9GfXIvy-jSo6-W9siAukUYgFjg0S4"; 
 
 /**
- * 1. BEITRÄGE LADEN
+ * 1. BEITRÄGE LADEN (KACHELN-FIX)
  */
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
@@ -15,14 +13,19 @@ async function fetchPosts() {
         const res = await fetch(API_URL);
         const posts = await res.json();
         container.innerHTML = ""; 
+        
         posts.forEach((post) => {
-            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url || `https://picsum.photos/seed/${post.id}/600/400`;
+            const media = post._embedded?.['wp:featuredmedia']?.[0]?.source_url 
+                          || `https://picsum.photos/seed/${post.id}/600/400`;
+            
             const hasH5P = post.content.rendered.toLowerCase().includes('h5p');
+
+            // Die exakte Kachel-Struktur zurückbringen
             const col = document.createElement('div');
             col.className = 'w-full'; 
             col.innerHTML = `
                 <div class="hover-card bg-white rounded-[1.5rem] overflow-hidden shadow-sm border border-slate-100 flex flex-col h-full">
-                    <div class="h-44 overflow-hidden bg-slate-50 flex items-center justify-center">
+                    <div class="h-44 overflow-hidden bg-slate-100 flex items-center justify-center">
                         <img src="${media}" class="w-full h-full object-cover">
                     </div>
                     <div class="p-5 flex flex-col flex-grow">
@@ -33,11 +36,16 @@ async function fetchPosts() {
                         </div>
                     </div>
                 </div>`;
+            
             col.querySelector('.js-details').onclick = () => openContent(post.id, false);
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
+            
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler Posts:", e); }
+        console.log("✅ Kacheln sind wieder da.");
+    } catch (e) { 
+        console.error("Fehler beim Kachel-Laden:", e);
+    }
 }
 
 /**
@@ -46,16 +54,21 @@ async function fetchPosts() {
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
+    if (!modal || !body) return;
+
     modal.classList.remove('hidden');
-    body.innerHTML = 'Lädt...';
+    body.innerHTML = '<div class="text-center py-20 italic">Inhalt wird geladen...</div>';
+    
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
+        
         let h5pId = null;
         if (post._embedded?.['wp:term']?.[1]) {
             const idTag = post._embedded['wp:term'][1].find(t => !isNaN(t.name.trim()));
             if (idTag) h5pId = idTag.name.trim();
         }
+
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
@@ -65,29 +78,34 @@ async function openContent(postId, directH5P) {
 }
 
 /**
- * 3. CHAT-BOT (DIREKT-MODUS)
+ * 3. CHAT-BOT LOGIK
  */
 function initChat() {
+    const chatToggle = document.getElementById('chat-toggle');
     const chatWindow = document.getElementById('chat-window');
     const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat');
     const msgArea = document.getElementById('chat-messages');
 
-    document.getElementById('chat-toggle')?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
+    chatToggle?.addEventListener('click', () => chatWindow.classList.toggle('hidden'));
     document.getElementById('close-chat')?.addEventListener('click', () => chatWindow.classList.add('hidden'));
 
     document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.addEventListener('click', () => { chatInput.value = chip.innerText; askGemini(chip.innerText); });
+        chip.addEventListener('click', () => { 
+            chatInput.value = chip.innerText; 
+            askGemini(chip.innerText); 
+        });
     });
 
     async function askGemini(question) {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("DEIN_AIZA")) {
-            alert("Bitte trage den API-Key im Code ein!");
+        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("HIER_EINSETZEN")) {
+            alert("Bitte trage den Key oben im Code ein!");
             return;
         }
         
         const addMsg = (text, isBot = true) => {
             const m = document.createElement('div');
-            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs mb-2" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs mb-2";
+            m.className = isBot ? "bg-white p-3 rounded-2xl shadow-sm border border-slate-100 max-w-[85%] text-xs text-slate-800 mb-2" : "bg-[#00aaff] text-white p-3 rounded-2xl ml-auto max-w-[85%] text-right text-xs mb-2";
             m.innerText = text;
             msgArea.appendChild(m);
             msgArea.scrollTop = msgArea.scrollHeight;
@@ -96,29 +114,48 @@ function initChat() {
 
         addMsg(question, false);
         chatInput.value = "";
-        const loadingMsg = addMsg("KI antwortet...");
+        const loadingMsg = addMsg("Ich überlege...");
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + question }] }] })
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + question }] }]
+                })
             });
+
             const data = await response.json();
             if (data.candidates) {
                 loadingMsg.innerText = data.candidates[0].content.parts[0].text;
             } else {
-                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Check Console");
-                console.log(data);
+                loadingMsg.innerText = "Fehler: " + (data.error?.message || "Google blockiert.");
             }
-        } catch (err) { loadingMsg.innerText = "Verbindung fehlgeschlagen."; }
+        } catch (err) {
+            loadingMsg.innerText = "Verbindung fehlgeschlagen.";
+        }
     }
 
-    document.getElementById('send-chat')?.addEventListener('click', () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); });
+    sendBtn?.onclick = () => { if(chatInput.value.trim()) askGemini(chatInput.value.trim()); };
+    chatInput?.onkeypress = (e) => { if (e.key === 'Enter' && chatInput.value.trim()) askGemini(chatInput.value.trim()); };
 }
 
+/**
+ * 4. START
+ */
 document.addEventListener('DOMContentLoaded', () => {
     fetchPosts();
     initChat();
-    document.getElementById('closeModal')?.addEventListener('click', () => document.getElementById('contentModal').classList.add('hidden'));
+    
+    document.getElementById('closeModal')?.addEventListener('click', () => {
+        document.getElementById('contentModal').classList.add('hidden');
+    });
+
+    document.getElementById('searchInput')?.addEventListener('input', () => {
+        const term = document.getElementById('searchInput').value.toLowerCase().trim();
+        document.querySelectorAll('.hover-card').forEach(card => {
+            const title = card.querySelector('h5').innerText.toLowerCase();
+            card.parentElement.style.display = title.includes(term) ? 'block' : 'none';
+        });
+    });
 });
