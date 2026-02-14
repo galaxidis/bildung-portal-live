@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-// 1. MODAL & H5P (FIXIERT)
+// 1. MODAL & H5P (STABIL)
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -39,7 +39,7 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("WP-Fehler"); }
+    } catch (e) { console.error("Kachel-Fehler"); }
 }
 
 async function openContent(postId, directH5P) {
@@ -59,12 +59,12 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700 font-sans">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
         }
     } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (DER "REGION-BYPASS" FIX)
+// 4. CHAT-BOT (MULTI-ROUTING FIX)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -77,47 +77,51 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "Verbindung wird aufgebaut...";
+        m.innerText = "Suche bestes Modell...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
-        try {
-            // Wir nutzen v1beta, aber ohne die strengen Header, die CORS oft auslösen
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + q }] }],
-                    safetySettings: [
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" }
-                    ]
-                })
-            });
+        // Alle Kombinationen, die Google aktuell erlaubt
+        const configs = [
+            { ver: "v1beta", mod: "gemini-1.5-flash" },
+            { ver: "v1", mod: "gemini-1.5-flash" },
+            { ver: "v1beta", mod: "gemini-1.5-pro" }
+        ];
 
-            const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content) {
-                m.innerText = data.candidates[0].content.parts[0].text;
-            } else {
-                m.innerText = "Region-Sperre aktiv. Bitte versuche es in 1 Minute nochmal.";
-            }
-        } catch (err) { 
-            m.innerText = "Google blockiert aktuell die IP. Bitte Seite neu laden."; 
+        let success = false;
+        for (let config of configs) {
+            if (success) break;
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/${config.ver}/models/${config.mod}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + q }] }] })
+                });
+                const data = await response.json();
+                if (data.candidates && data.candidates[0].content) {
+                    m.innerText = data.candidates[0].content.parts[0].text;
+                    success = true;
+                }
+            } catch (err) { console.log("Fehlversuch: " + config.mod); }
         }
+
+        if (!success) m.innerText = "Alle Google-Modelle blockiert. Bitte Region im AI Studio prüfen.";
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // CHIPS - DIREKTE BINDUNG
-    document.querySelectorAll('.chat-chip').forEach(chip => {
-        chip.style.cursor = "pointer";
-        chip.onclick = (e) => {
-            e.preventDefault();
-            ask(chip.innerText);
-        };
-    });
+    // CHIPS - ENDGÜLTIGE BINDUNG
+    function setupChips() {
+        document.querySelectorAll('.chat-chip').forEach(chip => {
+            chip.style.cursor = "pointer";
+            // Wir entfernen alte Listener und setzen neue
+            const newChip = chip.cloneNode(true);
+            chip.parentNode.replaceChild(newChip, chip);
+            newChip.addEventListener('click', () => ask(newChip.innerText));
+        });
+    }
 
+    setupChips();
     document.getElementById('send-chat').onclick = () => ask(input.value);
     input.onkeypress = (e) => { if(e.key === 'Enter') ask(input.value); };
 }
