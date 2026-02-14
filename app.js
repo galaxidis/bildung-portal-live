@@ -1,7 +1,7 @@
 const API_URL = 'https://hub.bildungdigital.at/wp-json/wp/v2/posts?categories=3&per_page=100&_embed';
 const GEMINI_API_KEY = "AIzaSyAkblWC7lKCvFiXYkKht7BKobVVdaNEQc0"; 
 
-// 1. MODAL-STEUERUNG
+// 1. MODAL SCHLIESSEN
 function closeModal() {
     const modal = document.getElementById('contentModal');
     if (modal) {
@@ -10,7 +10,7 @@ function closeModal() {
     }
 }
 
-// 2. BEITRÄGE LADEN (Kacheln & H5P-Start)
+// 2. BEITRÄGE LADEN
 async function fetchPosts() {
     const container = document.getElementById('posts-container');
     if (!container) return;
@@ -40,16 +40,16 @@ async function fetchPosts() {
             if (hasH5P) col.querySelector('.js-start').onclick = () => openContent(post.id, true);
             container.appendChild(col);
         });
-    } catch (e) { console.error("Fehler Kacheln:", e); }
+    } catch (e) { console.error("Kacheln:", e); }
 }
 
-// 3. INHALT ÖFFNEN (Inkl. H5P Iframe)
+// 3. INHALT ÖFFNEN
 async function openContent(postId, directH5P) {
     const modal = document.getElementById('contentModal');
     const body = document.getElementById('modalTextContent');
     if (!modal || !body) return;
     modal.classList.remove('hidden');
-    body.innerHTML = 'Wird geladen...';
+    body.innerHTML = 'Lade...';
     try {
         const res = await fetch(`https://hub.bildungdigital.at/wp-json/wp/v2/posts/${postId}?_embed`);
         const post = await res.json();
@@ -61,12 +61,12 @@ async function openContent(postId, directH5P) {
         if (directH5P && h5pId) {
             body.innerHTML = `<div class="w-full h-[70vh]"><iframe src="https://hub.bildungdigital.at/wp-admin/admin-ajax.php?action=h5p_embed&id=${h5pId}" class="w-full h-full border-0" allowfullscreen></iframe></div>`;
         } else {
-            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none">${post.content.rendered}</div>`;
+            body.innerHTML = `<h2 class="text-2xl font-bold mb-4 text-[#003366]">${post.title.rendered}</h2><div class="prose max-w-none text-slate-700">${post.content.rendered}</div>`;
         }
-    } catch (e) { body.innerHTML = "Fehler beim Laden."; }
+    } catch (e) { body.innerHTML = "Fehler."; }
 }
 
-// 4. CHAT-BOT (Vorschläge anklickbar & funktionierende API)
+// 4. CHAT-BOT (DER ULTIMATIVE FIX FÜR V1BETA)
 function initChat() {
     const win = document.getElementById('chat-window');
     const input = document.getElementById('chat-input');
@@ -79,31 +79,42 @@ function initChat() {
         if (!q.trim()) return;
         const m = document.createElement('div');
         m.className = "bg-white p-3 rounded-2xl shadow-sm border mb-2 text-xs text-slate-800 max-w-[85%]";
-        m.innerText = "KI schreibt...";
+        m.innerText = "KI denkt nach...";
         msgs.appendChild(m);
         input.value = "";
         msgs.scrollTop = msgs.scrollHeight;
 
         try {
-            // Wir nutzen genau den Pfad, der bei dir gerade den Erfolg gebracht hat!
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            // ZURÜCK ZU v1beta ABER MIT DEM KORREKTEN MODELL-NAMEN FÜR AI STUDIO KEYS
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz auf Deutsch: " + q }] }] })
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Kurze Antwort auf Deutsch: " + q }] }] })
             });
+
             const data = await response.json();
-            m.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Fehler in der Antwort.";
-        } catch (err) { m.innerText = "Verbindung unterbrochen."; }
+            
+            if (data.candidates && data.candidates[0].content) {
+                m.innerText = data.candidates[0].content.parts[0].text;
+            } else {
+                // FALLBACK: Wenn Flash nicht will, probieren wir das alte Pro
+                m.innerText = "Modell-Wechsel...";
+                const res2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Antworte kurz: " + q }] }] })
+                });
+                const data2 = await res2.json();
+                m.innerText = data2.candidates?.[0]?.content?.parts?.[0]?.text || "Google blockiert den Zugriff. Bitte prüfe AI Studio Region.";
+            }
+        } catch (err) { m.innerText = "Verbindung fehlgeschlagen."; }
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // JETZT: Vorschläge (Chips) anklickbar machen
+    // CHIPS FIX: Event-Listener sauber binden
     document.querySelectorAll('.chat-chip').forEach(chip => {
         chip.style.cursor = "pointer";
-        chip.onclick = () => {
-            const text = chip.innerText;
-            ask(text);
-        };
+        chip.onclick = () => ask(chip.innerText);
     });
 
     document.getElementById('send-chat').onclick = () => ask(input.value);
